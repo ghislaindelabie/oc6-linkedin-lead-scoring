@@ -1,0 +1,101 @@
+name: CI/CD
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+          pip install -r requirements-prod.txt
+
+      - name: Run tests
+        env:
+          APP_ENV: test
+        run: |
+          pytest -q --maxfail=1 --disable-warnings \
+          --cov=src/linkedin_lead_scoring \
+          --cov-report=term-missing \
+          --cov-report=html \
+          --cov-report=xml \
+          --cov-fail-under=75
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: ./htmlcov
+          retention-days: 7
+
+  deploy:
+    name: Deploy to HF Spaces (Docker)
+    needs: test
+    if: github.ref == 'refs/heads/main' && success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install HF CLI
+        run: python -m pip install --upgrade "huggingface_hub[cli]>=0.23.2"
+
+      - name: Login to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          hf auth login --token "$HF_TOKEN" --add-to-git-credential || true
+
+      - name: Create Docker Space
+        env:
+          HF_USER: ghislaindelabie
+          SPACE: oc6-bizdev-ml-api
+        run: |
+          hf repo create "$HF_USER/$SPACE" --type space --space-sdk docker --yes || true
+
+      - name: Upload to HF Space
+        env:
+          HF_USER: ghislaindelabie
+          SPACE: oc6-bizdev-ml-api
+        run: |
+          hf upload "$HF_USER/$SPACE" . . --repo-type space \
+            --exclude ".git/*" \
+            --exclude ".venv/*" \
+            --exclude "tests/*" \
+            --exclude "htmlcov/*" \
+            --exclude ".pytest_cache/*" \
+            --exclude "*.pyc" \
+            --exclude "__pycache__/*" \
+            --exclude "notebooks/*" \
+            --exclude "mlruns/*" \
+            --exclude "data/*.csv" \
+            --exclude "data/*.json" \
+            --exclude "alembic/*" \
+            --exclude "alembic.ini"
+
+      - name: Display deployment info
+        run: |
+          echo "✅ Deployed to Hugging Face Spaces"
+          echo "🚀 API: https://ghislaindelabie-oc6-bizdev-ml-api.hf.space"
+          echo "📚 Docs: https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/docs"
