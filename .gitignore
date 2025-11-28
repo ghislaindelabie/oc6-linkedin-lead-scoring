@@ -1,0 +1,47 @@
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data (keep structure, exclude raw data)
+data/*.csv
+data/*.json
+data/*.parquet
+data/*.xlsx
+!data/README.md
+!data/.gitkeep
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Models (uncomment if models get too large)
+# model/*.pkl
+# model/*.joblib
+
+# Test artifacts
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Documentation (local only)
+docs/notes/
+docs/session log.md
+
+# Alembic
+alembic.ini
