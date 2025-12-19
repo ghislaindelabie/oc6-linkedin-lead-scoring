@@ -22,12 +22,15 @@ data/*.csv
 data/*.json
 data/*.parquet
 data/*.xlsx
+data/processed/  # Exclude processed data (generated artifacts)
 !data/README.md
 !data/.gitkeep
 
 # MLflow
 mlruns/
 mlartifacts/
+mlflow.db
+*.db
 
 # Models (uncomment if models get too large)
 # model/*.pkl

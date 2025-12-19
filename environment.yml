@@ -1,0 +1,29 @@
+name: oc6
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Python version
+  - python=3.11
+
+  # Big scientific packages (install via conda for better binary compatibility)
+  - numpy>=2.0.0
+  - pandas>=2.2.0
+  - scikit-learn>=1.5.0
+  - imbalanced-learn>=0.12.0  # Needs to match scikit-learn version
+  - matplotlib>=3.8.0
+  - seaborn>=0.13.0
+
+  # Jupyter for notebooks
+  - jupyterlab>=4.2.0
+  - ipykernel>=6.29.0
+
+  # Development tools
+  - pip>=24.0
+  - uv>=0.1.0  # Include uv in conda env
+
+  # Database drivers (for MLflow + Supabase)
+  - psycopg2>=2.9.0
+
+  # Note: Specialized packages (MLflow, XGBoost, FastAPI, etc.)
+  # will be installed via uv from pyproject.toml

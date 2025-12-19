@@ -215,6 +215,7 @@ git branch -d hotfix/critical-bug
 | Version | Date | Type | Description |
 |---------|------|------|-------------|
 | v0.1.0 | 2025-11-19 | Initial | Initial setup: FastAPI + MLflow + Tests |
+| v0.2.0 | In Progress | Minor | MLflow notebooks + data prep + model training |
 | v1.0.0 | TBD | Major | LemList integration + Model deployment |
 
 ---
@@ -242,4 +243,4 @@ git branch -d hotfix/critical-bug
 
 ---
 
-*Last updated: 2025-11-19*
+*Last updated: 2025-12-19*
