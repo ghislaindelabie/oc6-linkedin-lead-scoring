@@ -32,6 +32,7 @@ conda activate oc6
 - NumPy 2.x
 - pandas 2.2+
 - scikit-learn 1.5+
+- imbalanced-learn 0.12+
 - matplotlib, seaborn
 - JupyterLab, ipykernel
 - psycopg2 (PostgreSQL driver)
@@ -56,9 +57,9 @@ uv pip install -e ".[dev]"
 - MLflow 2.18+
 - XGBoost 3.0+
 - FastAPI + Uvicorn
-- SHAP, Optuna, imbalanced-learn
+- SHAP, Optuna, optuna-integration
 - httpx (LemList API client)
-- pytest, pytest-cov (dev tools)
+- pytest, pytest-cov, pytest-asyncio (dev tools)
 
 ---
 
@@ -134,18 +135,19 @@ uv pip install -e .
 
 ### Install via CONDA (environment.yml)
 ✅ numpy, pandas, scikit-learn
+✅ imbalanced-learn (matches scikit-learn version)
 ✅ matplotlib, seaborn
 ✅ jupyterlab, ipykernel
-✅ psycopg2, pyarrow
+✅ psycopg2
 
 **Why?** Better binary compatibility, handles complex C/Fortran dependencies
 
 ### Install via UV (pyproject.toml)
-✅ mlflow, xgboost, optuna
+✅ mlflow, xgboost, optuna, optuna-integration
 ✅ fastapi, uvicorn, pydantic
 ✅ httpx, python-dotenv
-✅ shap, imbalanced-learn
-✅ pytest, pytest-cov
+✅ shap
+✅ pytest, pytest-cov, pytest-asyncio
 
 **Why?** Pure Python or simpler dependencies, uv is 10-100x faster
 
