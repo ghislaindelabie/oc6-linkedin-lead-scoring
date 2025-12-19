@@ -483,27 +483,42 @@ def prepare_profile_text_column(df: pd.DataFrame, output_column: str = "profile_
     """
     df = df.copy()
 
-    # Build profile text from available fields
-    parts = []
+    # Build profile text row by row
+    profile_parts = []
+    fields_used = []
 
+    # Check which fields are available
     if 'firstname' in df.columns and 'lastname' in df.columns:
-        parts.append("Name: " + df['firstname'].fillna("") + " " + df['lastname'].fillna(""))
+        profile_parts.append(
+            "Name: " + df['firstname'].fillna("") + " " + df['lastname'].fillna("")
+        )
+        fields_used.append("name")
 
     if 'title' in df.columns:
-        parts.append("Title: " + df['title'].fillna(""))
+        profile_parts.append("Title: " + df['title'].fillna(""))
+        fields_used.append("title")
 
     if 'companyname' in df.columns:
-        parts.append("Company: " + df['companyname'].fillna(""))
+        profile_parts.append("Company: " + df['companyname'].fillna(""))
+        fields_used.append("company")
 
     if 'companyindustry' in df.columns:
-        parts.append("Industry: " + df['companyindustry'].fillna(""))
+        profile_parts.append("Industry: " + df['companyindustry'].fillna(""))
+        fields_used.append("industry")
 
     if 'companysize' in df.columns:
-        parts.append("Company Size: " + df['companysize'].astype(str))
+        profile_parts.append("Company Size: " + df['companysize'].astype(str))
+        fields_used.append("size")
 
-    # Combine with newlines
-    df[output_column] = "\n".join(parts) if parts else "No profile data"
+    # Combine all parts with newlines for each row
+    if profile_parts:
+        # Use pandas string concatenation with separator
+        df[output_column] = profile_parts[0]
+        for part in profile_parts[1:]:
+            df[output_column] = df[output_column] + "\n" + part
+    else:
+        df[output_column] = "No profile data"
 
-    print(f"✓ Created {output_column} column from {len(parts)} fields")
+    print(f"✓ Created {output_column} column from {len(fields_used)} fields: {', '.join(fields_used)}")
 
     return df
