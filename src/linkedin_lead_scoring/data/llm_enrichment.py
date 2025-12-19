@@ -470,45 +470,121 @@ def enrich_column_with_llm(
 # Helper Functions
 # ============================================================================
 
-def prepare_profile_text_column(df: pd.DataFrame, output_column: str = "profile_text") -> pd.DataFrame:
+def prepare_profile_text_column(
+    df: pd.DataFrame,
+    output_column: str = "profile_text",
+    include_extended_fields: bool = False
+) -> pd.DataFrame:
     """
     Combine LinkedIn profile fields into a single text column for LLM processing.
+
+    Supports both snake_case and camelCase field names (LemList uses camelCase).
 
     Parameters:
     - df: DataFrame with LinkedIn profile data
     - output_column: Name for combined text column
+    - include_extended_fields: If True, includes summary, skills, icebreaker, etc.
 
     Returns:
     - DataFrame with new profile_text column
+
+    Example:
+        df = prepare_profile_text_column(df)
+        # Creates: "Name: John Doe\nTitle: CEO\nCompany: Acme Inc\n..."
     """
     df = df.copy()
+
+    def get_field(options):
+        """Try multiple field name variations, return first that exists."""
+        for opt in options:
+            if opt in df.columns:
+                return df[opt].fillna("")
+        return pd.Series("", index=df.index)
 
     # Build profile text row by row
     profile_parts = []
     fields_used = []
 
-    # Check which fields are available
-    if 'firstname' in df.columns and 'lastname' in df.columns:
-        profile_parts.append(
-            "Name: " + df['firstname'].fillna("") + " " + df['lastname'].fillna("")
-        )
+    # === Core Fields (Priority 1) ===
+
+    # Name (try: firstName/lastName, firstname/lastname)
+    first_name = get_field(['firstName', 'firstname'])
+    last_name = get_field(['lastName', 'lastname'])
+    if not first_name.str.strip().eq("").all() or not last_name.str.strip().eq("").all():
+        profile_parts.append("Name: " + first_name + " " + last_name)
         fields_used.append("name")
 
-    if 'title' in df.columns:
-        profile_parts.append("Title: " + df['title'].fillna(""))
-        fields_used.append("title")
+    # Job Title (try: jobTitle, title)
+    job_title = get_field(['jobTitle', 'title', 'position'])
+    if not job_title.str.strip().eq("").all():
+        profile_parts.append("Title: " + job_title)
+        fields_used.append("jobTitle")
 
-    if 'companyname' in df.columns:
-        profile_parts.append("Company: " + df['companyname'].fillna(""))
-        fields_used.append("company")
+    # Company Name (try: companyName, companyname)
+    company_name = get_field(['companyName', 'companyname'])
+    if not company_name.str.strip().eq("").all():
+        profile_parts.append("Company: " + company_name)
+        fields_used.append("companyName")
 
-    if 'companyindustry' in df.columns:
-        profile_parts.append("Industry: " + df['companyindustry'].fillna(""))
+    # Industry (try: companyIndustry, industry)
+    company_industry = get_field(['companyIndustry', 'companyindustry', 'industry'])
+    if not company_industry.str.strip().eq("").all():
+        profile_parts.append("Industry: " + company_industry)
         fields_used.append("industry")
 
-    if 'companysize' in df.columns:
-        profile_parts.append("Company Size: " + df['companysize'].astype(str))
-        fields_used.append("size")
+    # Company Size (try: companySize, companysize)
+    company_size = get_field(['companySize', 'companysize'])
+    if not company_size.str.strip().eq("").all():
+        profile_parts.append("Company Size: " + company_size.astype(str))
+        fields_used.append("companySize")
+
+    # Location (consistent naming)
+    location = get_field(['location'])
+    if not location.str.strip().eq("").all():
+        profile_parts.append("Location: " + location)
+        fields_used.append("location")
+
+    # === Extended Fields (Priority 2) - Rich context ===
+
+    if include_extended_fields:
+        # Tagline (LinkedIn headline)
+        tagline = get_field(['tagline'])
+        if not tagline.str.strip().eq("").all():
+            profile_parts.append("Headline: " + tagline)
+            fields_used.append("tagline")
+
+        # Summary (About section)
+        summary = get_field(['summary'])
+        if not summary.str.strip().eq("").all():
+            # Truncate long summaries for cost efficiency
+            truncated_summary = summary.str[:500]
+            profile_parts.append("Summary: " + truncated_summary)
+            fields_used.append("summary")
+
+        # Skills
+        skills = get_field(['skills'])
+        if not skills.str.strip().eq("").all():
+            profile_parts.append("Skills: " + skills)
+            fields_used.append("skills")
+
+        # Icebreaker (personalized note from LemList)
+        icebreaker = get_field(['icebreaker'])
+        if not icebreaker.str.strip().eq("").all():
+            profile_parts.append("Note: " + icebreaker)
+            fields_used.append("icebreaker")
+
+        # Company Description
+        company_desc = get_field(['companyDescription'])
+        if not company_desc.str.strip().eq("").all():
+            truncated_desc = company_desc.str[:300]
+            profile_parts.append("Company Info: " + truncated_desc)
+            fields_used.append("companyDescription")
+
+        # Company Specialties
+        company_spec = get_field(['companySpecialties'])
+        if not company_spec.str.strip().eq("").all():
+            profile_parts.append("Company Focus: " + company_spec)
+            fields_used.append("companySpecialties")
 
     # Combine all parts with newlines for each row
     if profile_parts:
@@ -519,6 +595,9 @@ def prepare_profile_text_column(df: pd.DataFrame, output_column: str = "profile_
     else:
         df[output_column] = "No profile data"
 
-    print(f"✓ Created {output_column} column from {len(fields_used)} fields: {', '.join(fields_used)}")
+    print(f"✓ Created {output_column} column from {len(fields_used)} fields")
+    print(f"  Fields included: {', '.join(fields_used[:10])}")
+    if len(fields_used) > 10:
+        print(f"  ... and {len(fields_used) - 10} more")
 
     return df
