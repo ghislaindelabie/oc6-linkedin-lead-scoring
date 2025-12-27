@@ -84,6 +84,72 @@ Return ONLY a JSON array with exactly {batch_size} objects in this format:
 ]
 """
 
+PROMPT_GEOGRAPHY = """
+Classify these {batch_size} LinkedIn profiles based on their geographic location (city/country).
+Determine if they are located in an international hub, regional hub, or other location.
+
+Categories:
+- "international_hub": Major global business centers (Paris, London, Frankfurt, Amsterdam, Milan, NYC, Los Angeles)
+- "regional_hub": Significant cities with business activity in developed countries but not top-tier (Lyon, Manchester, Turin, Helsinki)
+- "other": Smaller cities (e.g., Chambéry) or unknown locations
+
+{batch_data}
+
+Return ONLY a JSON array with exactly {batch_size} objects in this format:
+[
+  {{"index": 0, "geography": "international_hub", "city": "Paris", "confidence": 0.95}},
+  {{"index": 1, "geography": "regional_hub", "city": "Lyon", "confidence": 0.90}},
+  {{"index": 2, "geography": "other", "city": "Unknown", "confidence": 0.50}}
+]
+"""
+
+PROMPT_BUSINESS_TYPE = """
+Analyze these {batch_size} LinkedIn profiles to classify the type of business professional.
+
+Categories:
+- "salespeople": Profiles projecting sales-oriented attitude, roles in sales/business development
+- "experts": Consultants, researchers, authors, speakers; profiles showcasing thought leadership and expertise
+- "workers": Hands-on makers and operators; less verbose profiles focused on execution rather than personal branding
+- "leaders": Decision-makers (CEO, COO, CFO, VP or equivalent) in larger companies (not SMEs); significant experience in reputable organizations
+- "others": Unclear or difficult to classify profiles (acceptable category to avoid mis-categorization)
+
+{batch_data}
+
+Return ONLY a JSON array with exactly {batch_size} objects in this format:
+[
+  {{"index": 0, "business_type": "leaders", "reasoning": "CFO at Fortune 500 company, 15+ years experience", "confidence": 0.95}},
+  {{"index": 1, "business_type": "experts", "reasoning": "Published consultant, frequent speaker", "confidence": 0.85}},
+  {{"index": 2, "business_type": "salespeople", "reasoning": "Business Development Manager, sales-focused profile", "confidence": 0.90}},
+  {{"index": 3, "business_type": "others", "reasoning": "Insufficient information to classify", "confidence": 0.40}}
+]
+"""
+
+PROMPT_COMPANY_FIT = """
+Assess these {batch_size} companies for potential fit with Alien Intelligence's services.
+
+About Alien Intelligence: Provides quality content and rights-cleared data for AI applications, serving media, creative industries, publishing, research, R&D, and similar sectors with data-streaming technology.
+
+Evaluate company fit based on:
+- Main activities and industry
+- Company size and market position
+- Potential need for rights-cleared data/content for AI
+- Role in their industry
+
+Scoring (integers only):
+- 0: Unknown/insufficient data OR clearly low fit with company
+- 1: Medium fit - reasonable potential but not highly promising
+- 2: Clear match - company would clearly benefit from Alien's technology given their industry and activities
+
+{batch_data}
+
+Return ONLY a JSON array with exactly {batch_size} objects in this format:
+[
+  {{"index": 0, "company_fit": 2, "reasoning": "Publishing company actively developing AI products, clear need for rights-cleared content"}},
+  {{"index": 1, "company_fit": 1, "reasoning": "Media company, potential interest but unclear AI strategy"}},
+  {{"index": 2, "company_fit": 0, "reasoning": "Manufacturing company with no evident content/data needs"}}
+]
+"""
+
 
 # ============================================================================
 # OpenAI Client Wrapper
