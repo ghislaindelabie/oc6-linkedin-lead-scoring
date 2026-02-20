@@ -1,7 +1,7 @@
 # Session Coordination — OC8 Parallel Development
 
 **Version branch**: `v0.3.0`
-**Last updated**: 2026-02-20 (Session B — B.1 complete)
+**Last updated**: 2026-02-20 (Session B — B.2 complete)
 
 ---
 
@@ -11,7 +11,7 @@
 |---------|--------|----------|--------|--------------|-------------|
 | **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
 | **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | Not started | — | — |
-| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | In progress | B.2 — /predict endpoint | B.1 done |
+| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | In progress | B.3 — /predict/batch endpoint | B.2 done |
 | **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | Not started | — | — |
 
 ## Merge Queue
@@ -38,7 +38,7 @@ When a session needs a new dependency, record it here. Session A will integrate.
 |---------|-----------|---------|--------|
 | `evidently` | C | `>=0.4.0` | No |
 | `streamlit` | C | `>=1.30.0` | No |
-| `joblib` | A, B | `>=1.3.0` | No |
+| `joblib` | A, B | `>=1.3.0` | No — **needed by B.2 real model path; add to requirements-prod.txt** |
 | `onnx` | C | `>=1.15.0` | No |
 | `onnxruntime` | C | `>=1.17.0` | No |
 | `psycopg2-binary` | A | `>=2.9.0` | No |
