@@ -1,7 +1,7 @@
 # Session Coordination — OC8 Parallel Development
 
 **Version branch**: `v0.3.0`
-**Last updated**: 2026-02-20 (Session A — All tasks complete + review fixes + staging)
+**Last updated**: 2026-02-20 (All sessions complete — PRs A, B, C ready to merge into v0.3.0)
 
 ---
 
@@ -9,16 +9,18 @@
 
 | Session | Branch | Worktree | Status | Current Task | Last Commit |
 |---------|--------|----------|--------|--------------|-------------|
-| **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
-| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | **Done** | — | All tasks + review fixes + staging |
-| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | Not started | — | — |
-| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | Not started | — | — |
+| **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Merge PRs | `0be90e2` |
+| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | **Done — PR ready** | — | All tasks + review fixes + staging |
+| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | **Done — PR ready** | — | — |
+| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | **Done — PR ready** | — | — |
 
 ## Merge Queue
 
 | PR | Source Branch | Target | Status | Reviewer |
 |----|--------------|--------|--------|----------|
-| — | — | — | — | — |
+| #5 | `feature/infra-cicd` | `v0.3.0` | **Ready** | Opus |
+| B  | `feature/api-scoring` | `v0.3.0` | **Ready** | Opus |
+| C  | `feature/monitoring` | `v0.3.0` | **Ready** | Opus |
 
 ## Dependency Tracker
 
@@ -33,8 +35,8 @@
 | CI/CD: security scan (`.github/workflows/security.yml`) | Session A | All | **Ready** (A.5) — pip-audit + bandit weekly, artifacts uploaded |
 | CI/CD: dashboard deploy (`.github/workflows/dashboard.yml`) | Session A | C | **Ready** (A.5) — deploys streamlit_app.py to oc6-bizdev-monitoring on push to main |
 | CI/CD: staging deploy (`.github/workflows/staging.yml`) | Session A | All | **Ready** (S1) — deploys API + dashboard to `-staging` HF Spaces on push to `v*.*.*` branches; requires `STAGING_DATABASE_URL` secret |
-| API schemas finalized | Session B | C (for monitoring) | Pending |
-| Production logging format | Session B | C (for drift analysis) | Pending |
+| API schemas finalized | Session B | C (for monitoring) | **Ready** (PR B) |
+| Production logging format | Session B | C (for drift analysis) | **Ready** (PR B) |
 
 ## Shared Dependencies (pyproject.toml additions)
 
@@ -65,6 +67,8 @@ When a session needs a new dependency, record it here. Session A will integrate.
 
 | Action | When | Notes |
 |--------|------|-------|
-| Create Supabase staging project | Before merging PR #5 | Separate project from production |
-| Add `STAGING_DATABASE_URL` to GitHub repo secrets | Before first push to `v0.3.0` | Triggers staging.yml deploy |
-| HF Spaces creation | Automatic | `staging.yml` creates them on first run with `|| true` |
+| ~~Create Supabase staging project~~ | ~~Before merging PR #5~~ | ✅ Done — using resumed project |
+| ~~Add `STAGING_DATABASE_URL` to GitHub repo secrets~~ | ~~Before first push to `v0.3.0`~~ | ✅ Done |
+| HF Spaces creation | Automatic on first push to `v0.3.0` | `staging.yml` creates them with `\|\| true` |
+| Set `DATABASE_URL` on production HF Space | Before Session B endpoint goes live | Needed for persistent prediction logging in production |
+| Merge PR #5 → B → C into `v0.3.0` | Now | Triggers staging deploy automatically |
