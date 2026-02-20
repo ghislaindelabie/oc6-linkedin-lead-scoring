@@ -1,0 +1,9 @@
+# Streamlit monitoring dashboard dependencies
+# Pin minor versions; patch updates are safe.
+streamlit>=1.30.0,<2.0
+evidently>=0.7.0,<1.0
+httpx>=0.27.0
+pandas>=2.0
+numpy>=1.26
+scipy>=1.11
+plotly>=5.20
