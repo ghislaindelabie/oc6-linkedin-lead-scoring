@@ -1,7 +1,7 @@
 # Session Coordination — OC8 Parallel Development
 
 **Version branch**: `v0.3.0`
-**Last updated**: 2026-02-20 (Session B — B.3 complete)
+**Last updated**: 2026-02-20 (Session B — B.4 complete)
 
 ---
 
@@ -11,7 +11,7 @@
 |---------|--------|----------|--------|--------------|-------------|
 | **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
 | **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | Not started | — | — |
-| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | In progress | B.4 — logging middleware | B.3 done |
+| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | In progress | B.5 — unit tests | B.4 done |
 | **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | Not started | — | — |
 
 ## Merge Queue
@@ -28,7 +28,7 @@
 | Feature columns (`model/feature_columns.json`) | Session A | B, C | Pending |
 | Reference data (`data/reference/`) | Session A | C | Pending |
 | API schemas finalized | Session B | C (for monitoring) | **Done** (B.1) |
-| Production logging format | Session B | C (for drift analysis) | Pending |
+| Production logging format | Session B | C (for drift analysis) | **Done** (B.4) — `logs/predictions.jsonl`, one JSON line per prediction: `{timestamp, input, score, label, inference_ms, model_version}` |
 
 ## Shared Dependencies (pyproject.toml additions)
 
