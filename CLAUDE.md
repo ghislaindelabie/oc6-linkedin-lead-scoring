@@ -72,6 +72,22 @@ oc6-linkedin-lead-scoring/              (coordinator — Opus)
 4. Create PR targeting `v0.3.0` (not main)
 5. Opus coordinator reviews and merges with user approval
 
+## Development Workflow (Skills)
+
+Use these slash commands for consistent workflow:
+- **`/dev`** — Use for each implementation task. Follows TDD: write tests first, then implement, then verify.
+- **`/commit`** — Use after completing each task. Handles staging, diff review, and commit message formatting.
+- **`/test`** — Run the test suite and analyze results.
+- **`/document`** — Update documentation after significant changes.
+
+**Typical task flow**:
+1. Read the task description in your `SESSION_X_TASKS.md`
+2. Use `/dev` to implement (test-first approach)
+3. Verify tests pass: `python -m pytest tests/ -v --tb=short`
+4. Use `/commit` to commit with proper conventional format
+5. Push to your feature branch: `git push origin <your-branch>`
+6. Move to the next task
+
 ## Testing
 - Run `python -m pytest tests/ -v --tb=short` before every commit
 - Use mocks for external services (Supabase, MLflow server, HF Spaces)
