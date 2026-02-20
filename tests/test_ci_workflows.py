@@ -8,6 +8,7 @@ WORKFLOWS_DIR = Path(__file__).parent.parent / ".github" / "workflows"
 CI_YML = WORKFLOWS_DIR / "ci.yml"
 SECURITY_YML = WORKFLOWS_DIR / "security.yml"
 DASHBOARD_YML = WORKFLOWS_DIR / "dashboard.yml"
+STAGING_YML = WORKFLOWS_DIR / "staging.yml"
 
 
 def load_yaml(path: Path) -> dict:
@@ -189,3 +190,68 @@ class TestDashboardWorkflow:
         )
         assert "HF_TOKEN" in env_keys, \
             "dashboard.yml must use HF_TOKEN secret"
+
+
+# ---------------------------------------------------------------------------
+# staging.yml tests
+# ---------------------------------------------------------------------------
+
+class TestStagingWorkflow:
+    def test_staging_yml_exists(self):
+        assert STAGING_YML.exists(), "staging.yml must exist"
+
+    def test_staging_triggers_on_version_branch(self):
+        data = load_yaml(STAGING_YML)
+        triggers = data.get("on", data.get(True, {}))
+        push = triggers.get("push", {})
+        branches = push.get("branches", [])
+        assert any("v" in str(b) and "[0-9]" in str(b) for b in branches), \
+            "staging.yml must trigger on version branch pattern (e.g. v[0-9]+.*)"
+
+    def test_staging_has_test_job(self):
+        data = load_yaml(STAGING_YML)
+        assert "test" in data["jobs"], "staging.yml must have a 'test' job"
+
+    def test_staging_has_deploy_api_job(self):
+        data = load_yaml(STAGING_YML)
+        assert "deploy-staging-api" in data["jobs"], \
+            "staging.yml must have a 'deploy-staging-api' job"
+
+    def test_staging_has_deploy_dashboard_job(self):
+        data = load_yaml(STAGING_YML)
+        assert "deploy-staging-dashboard" in data["jobs"], \
+            "staging.yml must have a 'deploy-staging-dashboard' job"
+
+    def test_staging_deploys_to_staging_spaces(self):
+        data = load_yaml(STAGING_YML)
+        all_steps = []
+        for job in data["jobs"].values():
+            all_steps.extend(job.get("steps", []))
+        env_values = " ".join(
+            str(v) for s in all_steps
+            for v in (s.get("env", {}) or {}).values()
+        )
+        run_commands = " ".join(s.get("run", "") for s in all_steps)
+        combined = env_values + " " + run_commands
+        assert "ml-api-staging" in combined or "monitoring-staging" in combined, \
+            "staging.yml must target HF Spaces with '-staging' suffix"
+
+    def test_staging_api_needs_test(self):
+        data = load_yaml(STAGING_YML)
+        needs = data["jobs"]["deploy-staging-api"].get("needs", [])
+        if isinstance(needs, str):
+            needs = [needs]
+        assert "test" in needs, \
+            "deploy-staging-api must depend on the test job"
+
+    def test_staging_uses_hf_token(self):
+        data = load_yaml(STAGING_YML)
+        all_steps = []
+        for job in data["jobs"].values():
+            all_steps.extend(job.get("steps", []))
+        env_keys = " ".join(
+            k for s in all_steps
+            for k in (s.get("env", {}) or {}).keys()
+        )
+        assert "HF_TOKEN" in env_keys, \
+            "staging.yml must use HF_TOKEN secret"

@@ -1,0 +1,157 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-asyncio ruff aiosqlite pyyaml
+          pip install -r requirements-prod.txt
+
+      - name: Install project (editable)
+        run: python -m pip install -e .
+
+      - name: Lint with ruff
+        run: ruff check src/ tests/
+
+      - name: Run tests with coverage
+        env:
+          APP_ENV: test
+        run: |
+          pytest -q \
+            --cov=src/linkedin_lead_scoring \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=70
+
+  deploy-staging-api:
+    name: Deploy API to Staging HF Space
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install HF CLI
+        run: python -m pip install --upgrade "huggingface_hub[cli]>=0.23.2"
+
+      - name: Login to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential || true
+
+      - name: Create Staging Docker Space
+        env:
+          HF_USER: ghislaindelabie
+          SPACE: oc6-bizdev-ml-api-staging
+        run: |
+          huggingface-cli repo create "$HF_USER/$SPACE" --type space --space-sdk docker --yes || true
+
+      - name: Configure staging environment variables and secrets
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = "ghislaindelabie/oc6-bizdev-ml-api-staging"
+          api.add_space_variable(repo_id, "APP_ENV", "staging")
+          api.add_space_secret(repo_id, "DATABASE_URL", os.environ["STAGING_DATABASE_URL"])
+          EOF
+
+      - name: Upload to Staging HF Space
+        env:
+          HF_USER: ghislaindelabie
+          SPACE: oc6-bizdev-ml-api-staging
+        run: |
+          huggingface-cli upload "$HF_USER/$SPACE" . . --repo-type space \
+            --exclude ".git/*" \
+            --exclude ".venv/*" \
+            --exclude "tests/*" \
+            --exclude "htmlcov/*" \
+            --exclude ".pytest_cache/*" \
+            --exclude "*.pyc" \
+            --exclude "__pycache__/*" \
+            --exclude "notebooks/*" \
+            --exclude "mlruns/*" \
+            --exclude "data/*.csv" \
+            --exclude "data/*.json" \
+            --exclude "alembic/__pycache__/*"
+
+      - name: Display deployment info
+        run: |
+          echo "✅ Staging API deployed"
+          echo "🚀 Staging API: https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space"
+          echo "📚 Docs: https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space/docs"
+
+  deploy-staging-dashboard:
+    name: Deploy Dashboard to Staging HF Space
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install HF CLI
+        run: python -m pip install --upgrade "huggingface_hub[cli]>=0.23.2"
+
+      - name: Login to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential || true
+
+      - name: Create Staging Streamlit Space
+        env:
+          HF_USER: ghislaindelabie
+          SPACE: oc6-bizdev-monitoring-staging
+        run: |
+          huggingface-cli repo create "$HF_USER/$SPACE" --type space --space-sdk streamlit --yes || true
+
+      - name: Upload dashboard to Staging HF Space
+        env:
+          HF_USER: ghislaindelabie
+          SPACE: oc6-bizdev-monitoring-staging
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          huggingface-cli upload "$HF_USER/$SPACE" . . --repo-type space \
+            --include "streamlit_app.py" \
+            --include "src/linkedin_lead_scoring/monitoring/**" \
+            --include "model/**" \
+            --include "requirements-prod.txt" \
+            --include "pyproject.toml"
+
+      - name: Display deployment info
+        run: |
+          echo "✅ Staging dashboard deployed"
+          echo "📊 Staging Dashboard: https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space"
