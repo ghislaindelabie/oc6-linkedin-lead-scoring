@@ -1,7 +1,7 @@
 # Session Coordination — OC8 Parallel Development
 
 **Version branch**: `v0.3.0`
-**Last updated**: 2026-02-20 (Session A — Tasks A.1 + A.2 + A.3 complete)
+**Last updated**: 2026-02-20 (Session A — Tasks A.1–A.4 complete)
 
 ---
 
@@ -10,7 +10,7 @@
 | Session | Branch | Worktree | Status | Current Task | Last Commit |
 |---------|--------|----------|--------|--------------|-------------|
 | **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
-| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | In Progress | A.4: Dockerfile | A.1 + A.2 + A.3 done |
+| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | In Progress | A.5: CI/CD | A.1–A.4 done |
 | **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | Not started | — | — |
 | **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | Not started | — | — |
 
