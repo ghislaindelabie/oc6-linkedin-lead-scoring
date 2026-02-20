@@ -195,8 +195,15 @@ Automatic deployment to HF Spaces on push to `main` branch (after tests pass).
 
 - **CI/CD Pipeline:**
   - **`ci.yml`**: runs on every push/PR — ruff lint, pytest with 70% coverage gate, Docker build check (PRs only), deploy to HF Spaces API on main
+  - **`staging.yml`**: deploys to staging HF Spaces on push to version branches (`v*.*.*`) — separate API + dashboard spaces with staging DB
   - **`security.yml`**: weekly pip-audit (dependency CVEs) + bandit (static analysis), results uploaded as artifacts
   - **`dashboard.yml`**: deploys Streamlit monitoring dashboard to `oc6-bizdev-monitoring` HF Space on push to main
+
+- **Staging Environment:**
+  - Staging API: [https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space](https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space) (auto-created on first push to `v*.*.*`)
+  - Staging Dashboard: [https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space](https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space)
+  - Promotion flow: `feature/* → v0.3.0 (staging deploy) → main (production deploy)`
+  - **Manual setup required**: add `STAGING_DATABASE_URL` secret to GitHub repo (separate Supabase project)
 
 - **Production Logging:**
   - Async SQLAlchemy + Supabase PostgreSQL for prediction and API metric logging

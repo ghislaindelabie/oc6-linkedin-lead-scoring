@@ -1,7 +1,7 @@
 # Session Coordination — OC8 Parallel Development
 
 **Version branch**: `v0.3.0`
-**Last updated**: 2026-02-20 (Session A — Tasks A.1–A.5 complete)
+**Last updated**: 2026-02-20 (Session A — All tasks complete + review fixes + staging)
 
 ---
 
@@ -10,7 +10,7 @@
 | Session | Branch | Worktree | Status | Current Task | Last Commit |
 |---------|--------|----------|--------|--------------|-------------|
 | **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
-| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | In Progress | A.6: PR | A.1–A.5 done |
+| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | **Done** | — | All tasks + review fixes + staging |
 | **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | Not started | — | — |
 | **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | Not started | — | — |
 
@@ -32,6 +32,7 @@
 | CI/CD: lint + test + coverage (`.github/workflows/ci.yml`) | Session A | All | **Ready** (A.5) — ruff, pytest, 70% coverage gate, docker-build on PRs |
 | CI/CD: security scan (`.github/workflows/security.yml`) | Session A | All | **Ready** (A.5) — pip-audit + bandit weekly, artifacts uploaded |
 | CI/CD: dashboard deploy (`.github/workflows/dashboard.yml`) | Session A | C | **Ready** (A.5) — deploys streamlit_app.py to oc6-bizdev-monitoring on push to main |
+| CI/CD: staging deploy (`.github/workflows/staging.yml`) | Session A | All | **Ready** (S1) — deploys API + dashboard to `-staging` HF Spaces on push to `v*.*.*` branches; requires `STAGING_DATABASE_URL` secret |
 | API schemas finalized | Session B | C (for monitoring) | Pending |
 | Production logging format | Session B | C (for drift analysis) | Pending |
 
@@ -59,3 +60,11 @@ When a session needs a new dependency, record it here. Session A will integrate.
 - PRs target `v0.3.0`, never `main`
 - Opus reviews all PRs before merge
 - If you need a file owned by another session, create an interface/stub and document it here
+
+## Manual Actions Required (user)
+
+| Action | When | Notes |
+|--------|------|-------|
+| Create Supabase staging project | Before merging PR #5 | Separate project from production |
+| Add `STAGING_DATABASE_URL` to GitHub repo secrets | Before first push to `v0.3.0` | Triggers staging.yml deploy |
+| HF Spaces creation | Automatic | `staging.yml` creates them on first run with `|| true` |
