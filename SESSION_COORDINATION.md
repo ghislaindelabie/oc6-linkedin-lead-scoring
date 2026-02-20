@@ -1,7 +1,7 @@
 # Session Coordination — OC8 Parallel Development
 
 **Version branch**: `v0.3.0`
-**Last updated**: 2026-02-20 (Session A — Tasks A.1–A.4 complete)
+**Last updated**: 2026-02-20 (Session A — Tasks A.1–A.5 complete)
 
 ---
 
@@ -10,7 +10,7 @@
 | Session | Branch | Worktree | Status | Current Task | Last Commit |
 |---------|--------|----------|--------|--------------|-------------|
 | **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
-| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | In Progress | A.5: CI/CD | A.1–A.4 done |
+| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | In Progress | A.6: PR | A.1–A.5 done |
 | **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | Not started | — | — |
 | **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | Not started | — | — |
 
@@ -29,6 +29,9 @@
 | Reference data (`data/reference/`) | Session A | C | **Ready** (A.2) — 100 rows |
 | DB module (`src/.../db/`) | Session A | B (logging) | **Ready** (A.3) — `get_db()` dep, `log_prediction()`, `log_api_metric()` |
 | Alembic migrations (`alembic/`) | Session A | Deploy | **Ready** (A.3) — run `alembic upgrade head` before first deploy |
+| CI/CD: lint + test + coverage (`.github/workflows/ci.yml`) | Session A | All | **Ready** (A.5) — ruff, pytest, 70% coverage gate, docker-build on PRs |
+| CI/CD: security scan (`.github/workflows/security.yml`) | Session A | All | **Ready** (A.5) — pip-audit + bandit weekly, artifacts uploaded |
+| CI/CD: dashboard deploy (`.github/workflows/dashboard.yml`) | Session A | C | **Ready** (A.5) — deploys streamlit_app.py to oc6-bizdev-monitoring on push to main |
 | API schemas finalized | Session B | C (for monitoring) | Pending |
 | Production logging format | Session B | C (for drift analysis) | Pending |
 

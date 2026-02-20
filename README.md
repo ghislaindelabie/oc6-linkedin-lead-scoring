@@ -29,11 +29,14 @@ This project implements a complete MLOps pipeline for predicting LinkedIn lead e
 - Hybrid environment setup (conda for scientific packages, uv for ML packages)
 - FastAPI skeleton deployed to HF Spaces
 - Production model export pipeline (`scripts/export_model.py`)
-- Model artifacts committed: XGBoost model, preprocessor, feature columns
-- Drift detection reference dataset (`data/reference/training_reference.csv`)
+- Model artifacts committed: XGBoost model, preprocessor, feature columns (47)
+- Drift detection reference dataset (`data/reference/training_reference.csv`, 100 rows)
+- Async PostgreSQL DB layer (SQLAlchemy 2.0 + asyncpg + Alembic migrations)
+- Docker updated for production: model loading, alembic, health check, correct module path
+- CI/CD: three GitHub Actions workflows (lint+test+deploy, security scan, dashboard deploy)
 
 🚧 **In Progress** (v0.3.0 parallel sessions):
-- Session A: CI/CD enhancements, Supabase DB, Docker update
+- Session A: PR creation (A.1–A.5 done: deps, model export, DB, Docker, CI/CD)
 - Session B: Prediction API endpoint (`/predict`, `/batch-predict`)
 - Session C: Monitoring dashboard, drift detection
 
@@ -191,9 +194,9 @@ Automatic deployment to HF Spaces on push to `main` branch (after tests pass).
   - CI/CD pipeline validates before deployment
 
 - **CI/CD Pipeline:**
-  - GitHub Actions for automated testing and deployment
-  - Auto-deploy to Hugging Face Spaces on merge to main
-  - Git Flow branching strategy for organized releases
+  - **`ci.yml`**: runs on every push/PR — ruff lint, pytest with 70% coverage gate, Docker build check (PRs only), deploy to HF Spaces API on main
+  - **`security.yml`**: weekly pip-audit (dependency CVEs) + bandit (static analysis), results uploaded as artifacts
+  - **`dashboard.yml`**: deploys Streamlit monitoring dashboard to `oc6-bizdev-monitoring` HF Space on push to main
 
 - **Production Logging:**
   - Async SQLAlchemy + Supabase PostgreSQL for prediction and API metric logging
