@@ -9,6 +9,7 @@ import json
 import os
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
@@ -16,6 +17,9 @@ import pandas as pd
 from fastapi import APIRouter, FastAPI, HTTPException
 
 from .schemas import BatchPredictionRequest, BatchPredictionResponse, LeadInput, LeadPrediction
+
+# Module-level constant — override in tests via monkeypatch.setattr
+_PREDICTIONS_LOG = "logs/predictions.jsonl"
 
 # ---------------------------------------------------------------------------
 # Model paths (relative to the working directory where uvicorn is launched)
@@ -124,6 +128,25 @@ def is_model_loaded() -> bool:
     return _state["model_loaded"]
 
 
+def _log_prediction(lead: LeadInput, prediction: LeadPrediction) -> None:
+    """Append one prediction entry to the predictions log. Non-blocking."""
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "input": lead.model_dump(exclude_none=True),
+        "score": prediction.score,
+        "label": prediction.label,
+        "inference_ms": prediction.inference_time_ms,
+        "model_version": prediction.model_version,
+    }
+    try:
+        log_path = _PREDICTIONS_LOG
+        os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass  # log failures must never crash the endpoint
+
+
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
@@ -165,13 +188,15 @@ async def predict(lead: LeadInput) -> LeadPrediction:
 
         elapsed_ms = (time.perf_counter() - t0) * 1000
 
-        return LeadPrediction(
+        result = LeadPrediction(
             score=round(score, 4),
             label="engaged" if score >= 0.5 else "not_engaged",
             confidence=_get_confidence(score),
             model_version=_state["model_version"],
             inference_time_ms=round(elapsed_ms, 3),
         )
+        _log_prediction(lead, result)
+        return result
 
     except HTTPException:
         raise
@@ -236,6 +261,9 @@ async def predict_batch(request: BatchPredictionRequest) -> BatchPredictionRespo
 
         avg_score = round(sum(scores) / n, 4)
         high_engagement_count = sum(1 for s in scores if s >= 0.5)
+
+        for lead, pred in zip(leads, predictions):
+            _log_prediction(lead, pred)
 
         return BatchPredictionResponse(
             predictions=predictions,

@@ -42,6 +42,9 @@ mlflow.db
 # model/*.pkl
 # model/*.joblib
 
+# Runtime logs (keep directory structure, ignore content)
+logs/*.jsonl
+
 # Test artifacts
 .coverage
 coverage.xml
