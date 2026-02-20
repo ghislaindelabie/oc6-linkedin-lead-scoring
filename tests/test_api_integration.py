@@ -161,6 +161,102 @@ def test_cors_on_batch(dev_client):
 
 
 # ---------------------------------------------------------------------------
+# Request ID tracing (Task B.7)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+def test_predict_response_has_request_id(dev_client):
+    """Every response should include an X-Request-ID header."""
+    response = dev_client.post("/predict", json=VALID_LEAD)
+    assert "x-request-id" in response.headers
+    rid = response.headers["x-request-id"]
+    assert len(rid) > 0
+
+
+@pytest.mark.integration
+def test_health_response_has_request_id(dev_client):
+    """Even non-prediction endpoints should include X-Request-ID."""
+    response = dev_client.get("/health")
+    assert "x-request-id" in response.headers
+
+
+@pytest.mark.integration
+def test_request_ids_are_unique(dev_client):
+    """Each request should get a distinct X-Request-ID."""
+    r1 = dev_client.post("/predict", json=VALID_LEAD)
+    r2 = dev_client.post("/predict", json=VALID_LEAD)
+    assert r1.headers["x-request-id"] != r2.headers["x-request-id"]
+
+
+@pytest.mark.integration
+def test_client_provided_request_id_is_echoed(dev_client):
+    """If client sends X-Request-ID, server should use it."""
+    custom_id = "my-trace-12345"
+    response = dev_client.post(
+        "/predict",
+        json=VALID_LEAD,
+        headers={"X-Request-ID": custom_id},
+    )
+    assert response.headers["x-request-id"] == custom_id
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting info headers (Task B.7)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+def test_predict_response_has_rate_limit_headers(dev_client):
+    """Prediction responses include rate limiting info headers."""
+    response = dev_client.post("/predict", json=VALID_LEAD)
+    assert "x-ratelimit-limit" in response.headers
+    assert "x-ratelimit-remaining" in response.headers
+    # Values should be parseable as integers
+    assert int(response.headers["x-ratelimit-limit"]) > 0
+    assert int(response.headers["x-ratelimit-remaining"]) >= 0
+
+
+@pytest.mark.integration
+def test_batch_response_has_rate_limit_headers(dev_client):
+    """Batch prediction responses also include rate limiting headers."""
+    response = dev_client.post("/predict/batch", json={"leads": [VALID_LEAD]})
+    assert "x-ratelimit-limit" in response.headers
+    assert "x-ratelimit-remaining" in response.headers
+
+
+# ---------------------------------------------------------------------------
+# Structured error responses (Task B.7)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+def test_error_response_has_request_id(dev_client):
+    """Error responses should still include X-Request-ID for tracing."""
+    response = dev_client.post("/predict", json={"llm_quality": 999})
+    assert response.status_code == 422
+    assert "x-request-id" in response.headers
+
+
+@pytest.mark.integration
+def test_no_stack_traces_in_error_responses(dev_client, monkeypatch):
+    """Production errors must never leak Python stack traces."""
+    import linkedin_lead_scoring.api.predict as predict_module
+
+    class CrashModel:
+        def predict_proba(self, X):
+            raise RuntimeError("secret internal error details")
+
+    monkeypatch.setitem(predict_module._state, "model", CrashModel())
+    monkeypatch.setitem(predict_module._state, "is_mock", True)
+    response = dev_client.post("/predict", json=VALID_LEAD)
+    assert response.status_code == 500
+    body = response.text
+    assert "Traceback" not in body
+    assert "secret internal error details" not in body
+
+
+# ---------------------------------------------------------------------------
 # Logging creates files (integration with middleware + predict logging)
 # ---------------------------------------------------------------------------
 

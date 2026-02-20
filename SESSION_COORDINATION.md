@@ -1,7 +1,7 @@
 # Session Coordination — OC8 Parallel Development
 
 **Version branch**: `v0.3.0`
-**Last updated**: 2026-02-20 (Session B — B.6 complete)
+**Last updated**: 2026-02-20 (Session B — B.7 complete, all tasks done)
 
 ---
 
@@ -11,7 +11,7 @@
 |---------|--------|----------|--------|--------------|-------------|
 | **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
 | **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | Not started | — | — |
-| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | In progress | B.7 — error handling | B.6 done (99 tests) |
+| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | **Complete** | All B.1–B.7 done | B.7 done (109 tests) |
 | **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | Not started | — | — |
 
 ## Merge Queue

@@ -159,12 +159,39 @@ class TestPredictModelNotLoaded:
         response = client.post("/predict", json=VALID_LEAD)
         assert response.status_code == 503
 
-    def test_503_body_is_structured(self, client, monkeypatch):
+    def test_503_body_is_structured_error_response(self, client, monkeypatch):
+        """503 should use ErrorResponse schema: error + message fields."""
         import linkedin_lead_scoring.api.predict as predict_module
 
         monkeypatch.setitem(predict_module._state, "model_loaded", False)
         data = client.post("/predict", json={}).json()
-        assert "detail" in data
+        assert data["error"] == "service_unavailable"
+        assert "message" in data
+
+    def test_500_uses_structured_error_response(self, dev_client, monkeypatch):
+        """Internal errors should use ErrorResponse schema, not raw detail."""
+        import linkedin_lead_scoring.api.predict as predict_module
+
+        # Force a crash by replacing model with something that raises
+        class CrashModel:
+            def predict_proba(self, X):
+                raise RuntimeError("boom")
+
+        monkeypatch.setitem(predict_module._state, "model", CrashModel())
+        monkeypatch.setitem(predict_module._state, "is_mock", True)
+        data = dev_client.post("/predict", json={}).json()
+        assert data["error"] == "internal_error"
+        assert "message" in data
+        # Must NOT leak stack traces
+        assert "boom" not in data.get("message", "")
+        assert "Traceback" not in str(data)
+
+    def test_422_uses_structured_error_response(self, dev_client):
+        """Validation errors should use ErrorResponse schema."""
+        data = dev_client.post("/predict", json={"llm_quality": 999}).json()
+        assert data["error"] == "validation_error"
+        assert "message" in data
+        assert data["detail"] is not None
 
 
 # ---------------------------------------------------------------------------

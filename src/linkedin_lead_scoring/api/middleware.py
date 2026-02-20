@@ -1,13 +1,16 @@
 """
-Request logging middleware.
+Middleware stack for the LinkedIn Lead Scoring API.
 
-Appends one JSON line per HTTP request to logs/api_requests.jsonl.
-The log path is a module-level constant so tests can redirect it via
-monkeypatch without env-var complications.
+- RequestIDMiddleware: adds X-Request-ID to every response
+- RateLimitHeadersMiddleware: adds X-RateLimit-* info headers
+- RequestLoggingMiddleware: appends one JSON line per request to logs/
+
+Log paths are module-level constants so tests can redirect via monkeypatch.
 """
 import json
 import os
 import time
+import uuid
 from datetime import datetime, timezone
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -16,6 +19,39 @@ from starlette.responses import Response
 
 # Module-level constant — override in tests via monkeypatch.setattr
 _REQUESTS_LOG = "logs/api_requests.jsonl"
+
+# Rate limit info (informational only — not enforced server-side)
+_RATE_LIMIT = 100  # requests per minute (informational)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Attach a unique X-Request-ID to every response for tracing.
+
+    If the client sends an X-Request-ID header, the server echoes it back.
+    Otherwise a new UUID4 is generated.
+    """
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        # Store on request state so other middleware / handlers can access it
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+
+class RateLimitHeadersMiddleware(BaseHTTPMiddleware):
+    """Add informational rate-limit headers to every response.
+
+    These headers advertise the rate-limit policy to clients. Actual
+    enforcement is delegated to an API gateway / reverse proxy in production.
+    """
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
+        response.headers["X-RateLimit-Remaining"] = str(_RATE_LIMIT)
+        return response
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
