@@ -195,9 +195,15 @@ Automatic deployment to HF Spaces on push to `main` branch (after tests pass).
   - Auto-deploy to Hugging Face Spaces on merge to main
   - Git Flow branching strategy for organized releases
 
-- **Model Monitoring:** (Planned)
-  - Database logging for predictions (GDPR-compliant)
-  - Drift detection and performance monitoring
+- **Production Logging:**
+  - Async SQLAlchemy + Supabase PostgreSQL for prediction and API metric logging
+  - Tables: `prediction_logs` (score, features, inference time) + `api_metrics` (endpoint, status, latency)
+  - Local dev falls back to SQLite automatically (no setup needed)
+  - Alembic migrations in `alembic/` — run `alembic upgrade head` before first deploy
+
+- **Model Monitoring:** (Session C — in progress)
+  - Drift detection with Evidently AI
+  - Streamlit dashboard for monitoring
 
 ## License
 
