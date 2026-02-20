@@ -48,3 +48,8 @@ markers = [
     "slow: slow running tests",
 ]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore:numpy.core is deprecated:DeprecationWarning:evidently",
+    "ignore:invalid value encountered in divide:RuntimeWarning:numpy",
+    "ignore:divide by zero encountered in divide:RuntimeWarning:scipy",
+]
