@@ -210,20 +210,22 @@ class DriftDetector:
     def _is_column_drifted(self, result, metric) -> bool:
         """Determine if a single column's drift result indicates drift.
 
-        Evidently's `ValueDrift` result contains `.tests` which hold pass/fail
-        info, but the simplest check is to inspect the counter widget label
-        which contains "Drift in column" when drift is detected.
+        Uses Evidently's structured result API: ``result.value`` is the
+        statistical test score (KS p-value for numeric, chi-squared score for
+        categorical).  Drift is detected when the score is below the threshold
+        stored in the result's metric location (default 0.05).
+
+        This replaces the earlier widget-text approach, which was coupled to
+        Evidently's internal UI rendering and would silently break on upgrades.
         """
-        # Check widget counter text: Evidently sets it to "Drift in column 'X'"
-        # when drift is detected, or "No drift in column 'X'" otherwise.
         if result is None:
             return False
-        if hasattr(result, "widget") and result.widget:
-            for widget in result.widget:
-                if hasattr(widget, "params") and widget.params:
-                    counters = widget.params.get("counters", [])
-                    for counter in counters:
-                        value_text = str(counter.get("value", "")).lower()
-                        if "drift in column" in value_text and "no drift" not in value_text:
-                            return True
-        return False
+        if not hasattr(result, "value"):
+            return False
+        try:
+            threshold = result.metric_value_location.metric.params.get(
+                "threshold", 0.05
+            )
+        except Exception:
+            threshold = 0.05
+        return float(result.value) < threshold

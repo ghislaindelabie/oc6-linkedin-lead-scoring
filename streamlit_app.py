@@ -61,7 +61,6 @@ REFERENCE_DATA_PATH = os.getenv(
 )
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:7860")
 REPORTS_DIR = Path("reports")
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
 # Data loading (cached)
@@ -88,7 +87,7 @@ def get_api_request_logs() -> list[dict]:
                 "endpoint": "/predict",
                 "method": "POST",
                 "status_code": 200,
-                "response_ms": e["inference_ms"] + np.random.uniform(2, 8),
+                "response_ms": e["inference_ms"] + np.random.default_rng(42).uniform(2, 8),
             }
             for e in pred_logs
         ]
@@ -112,6 +111,20 @@ def get_reference_data() -> pd.DataFrame:
 
     ref_logs = simulate_production_logs(n=300, seed=0)
     return pd.DataFrame([e["input"] for e in ref_logs])
+
+
+# ---------------------------------------------------------------------------
+# Drift report generation (cached — Evidently reports are expensive)
+# ---------------------------------------------------------------------------
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _generate_drift_report(
+    detector: DriftDetector, prod_df: "pd.DataFrame", output_path: str
+) -> None:
+    """Generate and write the Evidently HTML drift report (cached 5 min)."""
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    detector.generate_report(prod_df, output_path=output_path)
 
 
 # ---------------------------------------------------------------------------
@@ -259,10 +272,12 @@ else:
         ", ".join(drift_result["drifted_features"]) or "none",
     )
 
-    # Embedded Evidently HTML report
+    # Embedded Evidently HTML report — generated on demand, cached for 5 min
     with st.expander("Full Evidently drift report", expanded=False):
+        if st.button("Generate / refresh drift report"):
+            st.cache_data.clear()
         report_path = str(REPORTS_DIR / "drift_report.html")
-        detector.generate_report(prod_df[common_cols], output_path=report_path)
+        _generate_drift_report(detector, prod_df[common_cols], report_path)
         with open(report_path, "r", encoding="utf-8") as f:
             html = f.read()
         components.html(html, height=600, scrolling=True)

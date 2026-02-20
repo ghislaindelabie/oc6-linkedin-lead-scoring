@@ -212,10 +212,12 @@ def measure_memory_mb(model, X: np.ndarray, n_calls: int = 10) -> float:
         Peak memory usage in megabytes during the timed block.
     """
     tracemalloc.start()
-    for _ in range(n_calls):
-        model.predict_proba(X)
-    _, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    try:
+        for _ in range(n_calls):
+            model.predict_proba(X)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
     return peak / (1024 * 1024)
 
 

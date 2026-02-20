@@ -72,9 +72,6 @@ def load_or_create_model(model_path: str):
 
 def make_sample_input(model, n_rows: int = 1) -> np.ndarray:
     """Generate random float32 input matching the model's expected feature count."""
-    import joblib
-    import xgboost as xgb
-
     # Try to infer feature count from the model
     if hasattr(model, "n_features_in_"):
         n_features = model.n_features_in_
@@ -138,7 +135,7 @@ SAMPLE_PAYLOAD = {
 }
 
 
-async def _send_requests(api_url: str, n_requests: int) -> list[float]:
+async def _send_requests(api_url: str, n_requests: int) -> tuple[list[float], int, float]:
     """Send n_requests POST /predict calls concurrently and collect latencies."""
     endpoint = f"{api_url.rstrip('/')}/predict"
     latencies: list[float] = []
