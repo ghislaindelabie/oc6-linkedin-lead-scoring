@@ -42,7 +42,7 @@ jobs:
         run: |
           hf upload "$HF_USER/$SPACE" . . --repo-type space \
             --include "streamlit_app.py" \
-            --include "src/**" \
+            --include "src/linkedin_lead_scoring/monitoring/**" \
             --include "model/**" \
             --include "requirements-prod.txt" \
             --include "pyproject.toml"

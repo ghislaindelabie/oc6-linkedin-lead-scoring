@@ -26,8 +26,8 @@ COPY model/ ./model/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
 
-# Install the package in editable mode so imports work correctly
-RUN pip install --no-cache-dir -e .
+# Install the package (production mode — not editable)
+RUN pip install --no-cache-dir .
 
 # Create non-root user
 RUN useradd -m -u 1000 apiuser && \
@@ -47,4 +47,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')" || exit 1
 
 # Run DB migrations then start the API server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn linkedin_lead_scoring.api.main:app --host 0.0.0.0 --port 7860"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn linkedin_lead_scoring.api.main:app --host 0.0.0.0 --port 7860"]

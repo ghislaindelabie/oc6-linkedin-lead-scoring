@@ -25,7 +25,7 @@ jobs:
       - name: Run pip-audit on production dependencies
         run: |
           pip-audit -r requirements-prod.txt --output-format json \
-            --output pip-audit-results.json || true
+            --output pip-audit-results.json
 
       - name: Upload pip-audit results
         uses: actions/upload-artifact@v4
@@ -52,7 +52,7 @@ jobs:
       - name: Run bandit on source code
         run: |
           bandit -r src/ -ll --format json \
-            --output bandit-results.json || true
+            --output bandit-results.json
 
       - name: Upload bandit results
         uses: actions/upload-artifact@v4
