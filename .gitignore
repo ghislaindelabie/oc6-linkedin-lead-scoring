@@ -3,6 +3,12 @@
 .vscode/
 .idea/
 
+# Claude Code local settings (personal, not shared)
+.claude/settings.local.json
+
+# Git worktrees
+worktrees/
+
 # Python
 __pycache__/
 *.pyc
