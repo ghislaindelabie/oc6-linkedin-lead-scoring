@@ -1,4 +1,4 @@
-"""Unit tests for /predict endpoint (Task B.2)"""
+"""Unit tests for /predict and /predict/batch endpoints (Tasks B.2, B.3)"""
 import pytest
 
 VALID_LEAD = {
@@ -156,3 +156,72 @@ class TestCORS:
             },
         )
         assert "access-control-allow-origin" in response.headers
+
+
+# ---------------------------------------------------------------------------
+# /predict/batch (Task B.3)
+# ---------------------------------------------------------------------------
+
+
+class TestBatchPredictEndpoint:
+    def test_batch_returns_correct_schema(self, dev_client):
+        payload = {"leads": [VALID_LEAD, VALID_LEAD]}
+        response = dev_client.post("/predict/batch", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert "predictions" in data
+        assert "total_count" in data
+        assert "avg_score" in data
+        assert "high_engagement_count" in data
+
+    def test_batch_total_count_matches_input(self, dev_client):
+        payload = {"leads": [VALID_LEAD] * 5}
+        data = dev_client.post("/predict/batch", json=payload).json()
+        assert data["total_count"] == 5
+        assert len(data["predictions"]) == 5
+
+    def test_batch_single_lead_works(self, dev_client):
+        payload = {"leads": [VALID_LEAD]}
+        response = dev_client.post("/predict/batch", json=payload)
+        assert response.status_code == 200
+        assert response.json()["total_count"] == 1
+
+    def test_batch_summary_stats_correct(self, dev_client):
+        """Mock always returns 0.65 — all leads engaged, avg=0.65."""
+        payload = {"leads": [VALID_LEAD] * 4}
+        data = dev_client.post("/predict/batch", json=payload).json()
+        assert data["total_count"] == 4
+        assert data["avg_score"] == pytest.approx(0.65, abs=0.01)
+        assert data["high_engagement_count"] == 4  # all scores >= 0.5
+
+    def test_batch_high_engagement_count_accurate(self, dev_client):
+        """high_engagement_count = leads with score >= 0.5."""
+        payload = {"leads": [VALID_LEAD] * 3}
+        data = dev_client.post("/predict/batch", json=payload).json()
+        predictions = data["predictions"]
+        expected = sum(1 for p in predictions if p["score"] >= 0.5)
+        assert data["high_engagement_count"] == expected
+
+    def test_batch_each_prediction_has_correct_schema(self, dev_client):
+        payload = {"leads": [VALID_LEAD, {}]}  # one full, one empty (all optional)
+        data = dev_client.post("/predict/batch", json=payload).json()
+        for pred in data["predictions"]:
+            assert 0.0 <= pred["score"] <= 1.0
+            assert pred["label"] in ("engaged", "not_engaged")
+            assert pred["confidence"] in ("low", "medium", "high")
+            assert pred["inference_time_ms"] >= 0.0
+
+    def test_batch_empty_list_returns_422(self, dev_client):
+        response = dev_client.post("/predict/batch", json={"leads": []})
+        assert response.status_code == 422
+
+    def test_batch_503_when_model_not_loaded(self, client, monkeypatch):
+        import linkedin_lead_scoring.api.predict as predict_module
+
+        monkeypatch.setitem(predict_module._state, "model_loaded", False)
+        response = client.post("/predict/batch", json={"leads": [VALID_LEAD]})
+        assert response.status_code == 503
+
+    def test_batch_endpoint_in_openapi(self, dev_client):
+        schema = dev_client.get("/openapi.json").json()
+        assert "/predict/batch" in schema["paths"]

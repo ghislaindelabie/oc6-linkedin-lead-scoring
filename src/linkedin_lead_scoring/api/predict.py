@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from fastapi import APIRouter, FastAPI, HTTPException
 
-from .schemas import LeadInput, LeadPrediction
+from .schemas import BatchPredictionRequest, BatchPredictionResponse, LeadInput, LeadPrediction
 
 # ---------------------------------------------------------------------------
 # Model paths (relative to the working directory where uvicorn is launched)
@@ -179,4 +179,75 @@ async def predict(lead: LeadInput) -> LeadPrediction:
         raise HTTPException(
             status_code=500,
             detail="Prediction failed due to an internal error.",
+        )
+
+
+@router.post(
+    "/predict/batch",
+    response_model=BatchPredictionResponse,
+    summary="Score a batch of leads (up to 10 000)",
+)
+async def predict_batch(request: BatchPredictionRequest) -> BatchPredictionResponse:
+    """
+    Predict engagement probability for a batch of LinkedIn leads.
+
+    All leads are scored in a single vectorised pass through the model.
+    Returns per-lead predictions plus summary statistics (total count,
+    average score, number of high-engagement leads with score >= 0.5).
+    """
+    if not _state["model_loaded"]:
+        raise HTTPException(
+            status_code=503,
+            detail="Model not loaded — service is not ready. Try again shortly.",
+        )
+
+    try:
+        leads = request.leads
+        n = len(leads)
+        t0 = time.perf_counter()
+
+        if _state["is_mock"]:
+            probas = _state["model"].predict_proba(leads)
+            scores = probas[:, 1].tolist()
+        else:
+            df = pd.DataFrame([lead.model_dump() for lead in leads])
+            feature_cols: list[str] = _state["feature_cols"]
+            for col in feature_cols:
+                if col not in df.columns:
+                    df[col] = np.nan
+            df = df[feature_cols]
+            X = _state["preprocessor"].transform(df)
+            probas = _state["model"].predict_proba(X)
+            scores = probas[:, 1].tolist()
+
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        per_lead_ms = round(elapsed_ms / n, 3)
+
+        predictions = [
+            LeadPrediction(
+                score=round(s, 4),
+                label="engaged" if s >= 0.5 else "not_engaged",
+                confidence=_get_confidence(s),
+                model_version=_state["model_version"],
+                inference_time_ms=per_lead_ms,
+            )
+            for s in scores
+        ]
+
+        avg_score = round(sum(scores) / n, 4)
+        high_engagement_count = sum(1 for s in scores if s >= 0.5)
+
+        return BatchPredictionResponse(
+            predictions=predictions,
+            total_count=n,
+            avg_score=avg_score,
+            high_engagement_count=high_engagement_count,
+        )
+
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Batch prediction failed due to an internal error.",
         )
