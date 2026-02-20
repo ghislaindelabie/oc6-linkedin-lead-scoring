@@ -123,7 +123,7 @@ class BatchPredictionRequest(BaseModel):
     """Batch prediction request — 1 to 100 leads."""
 
     leads: list[LeadInput] = Field(
-        ..., min_length=1, max_length=100, description="List of leads to score (max 100)"
+        ..., min_length=1, max_length=10_000, description="List of leads to score (max 10 000)"
     )
 
 

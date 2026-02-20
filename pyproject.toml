@@ -48,3 +48,4 @@ markers = [
     "slow: slow running tests",
 ]
 asyncio_mode = "auto"
+pythonpath = ["src"]

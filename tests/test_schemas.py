@@ -170,7 +170,7 @@ class TestBatchPredictionRequest:
             BatchPredictionRequest(leads=[])
 
     def test_batch_over_limit_rejected(self):
-        leads = [LeadInput(**VALID_LEAD)] * 101
+        leads = [LeadInput(**VALID_LEAD)] * 10_001
         with pytest.raises(ValidationError):
             BatchPredictionRequest(leads=leads)
 
