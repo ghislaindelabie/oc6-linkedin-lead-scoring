@@ -241,3 +241,88 @@ class TestGenerateReport:
             )
 
         assert returned_path == output_path
+
+
+# ---------------------------------------------------------------------------
+# Tests: DriftDetector edge cases (C.5 — coverage gaps)
+# ---------------------------------------------------------------------------
+
+class TestDriftDetectorEdgeCases:
+    def test_target_column_excluded(self):
+        """'engaged' column is excluded from _feature_columns at init."""
+        from linkedin_lead_scoring.monitoring.drift import DriftDetector
+
+        rng = np.random.default_rng(42)
+        n = 80
+        ref = pd.DataFrame({
+            "score_feature": rng.uniform(0, 1, size=n),
+            "engaged": rng.integers(0, 2, size=n).astype(float),
+        })
+        detector = DriftDetector(reference_data=ref)
+        assert "engaged" not in detector._feature_columns
+        assert "score_feature" in detector._feature_columns
+
+    def test_single_numeric_column(self):
+        """Drift detection with a single numeric column should succeed."""
+        from linkedin_lead_scoring.monitoring.drift import DriftDetector
+
+        rng = np.random.default_rng(0)
+        n = 80
+        ref = pd.DataFrame({"score": rng.uniform(0, 1, size=n)})
+        prod = pd.DataFrame({"score": rng.uniform(0, 1, size=50)})
+        detector = DriftDetector(reference_data=ref)
+        result = detector.detect_data_drift(production_data=prod)
+        assert result["total_features"] == 1
+        assert "drift_detected" in result
+
+    def test_production_has_extra_columns(self):
+        """Extra columns in production are silently ignored via _align_columns."""
+        from linkedin_lead_scoring.monitoring.drift import DriftDetector
+
+        rng = np.random.default_rng(7)
+        n = 80
+        ref = pd.DataFrame({
+            "feature_a": rng.uniform(0, 1, size=n),
+            "feature_b": rng.uniform(0, 1, size=n),
+        })
+        prod = pd.DataFrame({
+            "feature_a": rng.uniform(0, 1, size=50),
+            "feature_b": rng.uniform(0, 1, size=50),
+            "extra_col": rng.uniform(0, 1, size=50),
+        })
+        detector = DriftDetector(reference_data=ref)
+        result = detector.detect_data_drift(production_data=prod)
+        assert "drift_detected" in result
+        assert result["total_features"] == 2
+
+    def test_extract_drifted_columns_skips_none_results(self, reference_df):
+        """_extract_drifted_columns skips metrics with None result (line 197-198)."""
+        from linkedin_lead_scoring.monitoring.drift import DriftDetector
+        from evidently.metrics import ValueDrift
+
+        detector = DriftDetector(reference_data=reference_df)
+        metric = ValueDrift(column="timezone")
+        # Empty results dict forces result=None for every metric → continue branch
+        drifted = detector._extract_drifted_columns({}, [metric])
+        assert drifted == []
+
+    def test_is_column_drifted_returns_false_for_none_result(self, reference_df):
+        """_is_column_drifted(None, metric) returns False — defensive None guard (line 219)."""
+        from linkedin_lead_scoring.monitoring.drift import DriftDetector
+        from evidently.metrics import ValueDrift
+
+        detector = DriftDetector(reference_data=reference_df)
+        metric = ValueDrift(column="timezone")
+        assert detector._is_column_drifted(None, metric) is False
+
+    def test_is_column_drifted_returns_false_for_result_without_widget(self, reference_df):
+        """_is_column_drifted when result has no .widget attribute returns False (line 229)."""
+        from linkedin_lead_scoring.monitoring.drift import DriftDetector
+        from evidently.metrics import ValueDrift
+
+        class _FakeResult:
+            pass  # no .widget attribute
+
+        detector = DriftDetector(reference_data=reference_df)
+        metric = ValueDrift(column="timezone")
+        assert detector._is_column_drifted(_FakeResult(), metric) is False

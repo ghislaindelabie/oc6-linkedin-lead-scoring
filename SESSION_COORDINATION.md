@@ -12,7 +12,7 @@
 | **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
 | **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | Not started | — | — |
 | **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | Not started | — | — |
-| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | In progress | C.4 ONNX optimization | C.3 done |
+| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | In progress | C.6 docs | C.5 done |
 
 ## Merge Queue
 
@@ -77,8 +77,35 @@ When a session needs a new dependency, record it here. Session A will integrate.
 - **Tests**: `tests/test_profiler.py` — 12 tests (49 total)
 - **Known issue**: shared `oc6` conda env picks up whichever session's package was last installed; run `uv pip install -e .` from session-c root before testing
 
-### C.4 → C.6 — Pending
-Tasks being worked on in sequence per SESSION_C_TASKS.md.
+### C.4 — ONNX Model Optimization (complete)
+- **Created**: `src/linkedin_lead_scoring/monitoring/onnx_optimizer.py`
+  - `convert_xgboost_to_onnx(model, n_features) → onnx.ModelProto` — uses onnxmltools (NOT skl2onnx) FloatTensorType
+  - `OnnxInferenceSession(path)` — wraps ORT, exposes `predict_proba()` matching sklearn API
+  - `benchmark_comparison(joblib_model, onnx_session, X, n_calls) → dict` — perf_counter timing, `speedup_mean`
+  - `measure_memory_mb(model, X, n_calls) → float` — tracemalloc peak
+  - `save_benchmark_results(results, path) → str` — JSON to `reports/onnx_benchmark.json`
+- **Created**: `scripts/optimize_model.py` — CLI: convert → benchmark 1000 calls → measure memory → cProfile ONNX path
+- **Tests**: `tests/test_onnx_optimizer.py` — 11 tests (60 total)
+- **Critical**: `onnxmltools.convert.common.data_types.FloatTensorType` must be used — NOT `skl2onnx.common.data_types.FloatTensorType` (causes RuntimeError)
+- **ORT output**: `[labels, proba]` — proba may be numpy array or list-of-dicts; both handled in `predict_proba()`
+
+### C.5 — Consolidate and Complete Monitoring Tests (complete)
+- **Added to `tests/test_monitoring.py`** (19 → 25 tests):
+  - `TestComputeUptimeStats` — 5 tests: empty logs, all-200, mixed success/errors, all-errors, success+error=1
+  - `TestLoadJsonlWithBlankLines` — 1 test: blank and whitespace-only lines skipped in JSONL parser
+- **Added to `tests/test_drift.py`** (13 → 19 tests):
+  - `TestDriftDetectorEdgeCases` — 6 tests:
+    - `test_target_column_excluded`: 'engaged' removed from `_feature_columns` at init
+    - `test_single_numeric_column`: drift detection works with one feature
+    - `test_production_has_extra_columns`: extra cols silently ignored via `_align_columns`
+    - `test_extract_drifted_columns_skips_none_results`: covers `result is None: continue` branch (line 198)
+    - `test_is_column_drifted_returns_false_for_none_result`: covers None guard (line 219)
+    - `test_is_column_drifted_returns_false_for_result_without_widget`: covers no-widget fallback (line 229)
+- **Total**: 72 tests, 99.55% coverage on monitoring package (was 95.07% after C.4)
+- **Remaining uncovered**: `onnx_optimizer.py` line 124 (dict-based ORT proba output — defensive branch, never triggered by current ORT version)
+
+### C.6 — Pending
+`docs/PERFORMANCE_REPORT.md` and `docs/MONITORING_GUIDE.md` — next task.
 
 ## Notes
 

@@ -274,3 +274,83 @@ class TestComputeInferenceStats:
         result = compute_inference_stats([])
         assert result["mean_ms"] == 0.0
         assert result["p95_ms"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Test: compute_uptime_stats (C.5 gap — previously uncovered)
+# ---------------------------------------------------------------------------
+
+class TestComputeUptimeStats:
+    def _make_request_log(self, status_codes: list) -> list:
+        return [
+            {"timestamp": "2026-02-20T12:00:00", "endpoint": "/predict",
+             "status_code": sc, "response_ms": 20.0}
+            for sc in status_codes
+        ]
+
+    def test_empty_logs_returns_full_uptime(self):
+        from linkedin_lead_scoring.monitoring.dashboard_utils import compute_uptime_stats
+
+        result = compute_uptime_stats([])
+        assert result["total_requests"] == 0
+        assert result["success_rate"] == 1.0
+        assert result["error_rate"] == 0.0
+
+    def test_all_successful_requests(self):
+        from linkedin_lead_scoring.monitoring.dashboard_utils import compute_uptime_stats
+
+        logs = self._make_request_log([200, 200, 201, 204])
+        result = compute_uptime_stats(logs)
+        assert result["total_requests"] == 4
+        assert result["success_rate"] == 1.0
+        assert result["error_rate"] == 0.0
+
+    def test_mixed_success_and_errors(self):
+        from linkedin_lead_scoring.monitoring.dashboard_utils import compute_uptime_stats
+
+        logs = self._make_request_log([200, 200, 500, 503])  # 2 ok, 2 errors
+        result = compute_uptime_stats(logs)
+        assert result["total_requests"] == 4
+        assert abs(result["success_rate"] - 0.5) < 1e-9
+        assert abs(result["error_rate"] - 0.5) < 1e-9
+
+    def test_all_errors(self):
+        from linkedin_lead_scoring.monitoring.dashboard_utils import compute_uptime_stats
+
+        logs = self._make_request_log([500, 503, 404])
+        result = compute_uptime_stats(logs)
+        assert result["success_rate"] == 0.0
+        assert result["error_rate"] == 1.0
+
+    def test_success_rate_plus_error_rate_equals_one(self):
+        from linkedin_lead_scoring.monitoring.dashboard_utils import compute_uptime_stats
+
+        logs = self._make_request_log([200, 201, 400, 500])
+        result = compute_uptime_stats(logs)
+        assert abs(result["success_rate"] + result["error_rate"] - 1.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Test: JSONL with blank lines (C.5 gap — line 65 branch)
+# ---------------------------------------------------------------------------
+
+class TestLoadJsonlWithBlankLines:
+    def test_blank_lines_skipped(self):
+        """JSONL files with blank separator lines should parse correctly."""
+        import json, os, tempfile
+        from linkedin_lead_scoring.monitoring.dashboard_utils import load_prediction_logs
+
+        entry = {"timestamp": "2026-02-20T12:00:00", "score": 0.7,
+                 "label": "engaged", "inference_ms": 10.0, "model_version": "0.3.0"}
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+            f.write(json.dumps(entry) + "\n")
+            f.write("\n")          # blank line
+            f.write("   \n")      # whitespace-only line
+            f.write(json.dumps(entry) + "\n")
+            path = f.name
+
+        try:
+            logs = load_prediction_logs(path)
+            assert len(logs) == 2
+        finally:
+            os.unlink(path)
