@@ -8,14 +8,13 @@ scikit-learn>=1.5.0,<1.6.0
 xgboost>=3.0.5,<3.1.0
 pandas>=2.2.0,<2.3.0
 numpy>=2.0.0,<3.0.0
-imbalanced-learn>=0.12,<0.13
-shap>=0.46.0,<0.47.0
 joblib>=1.3.0,<2.0
 category-encoders>=2.6.0,<3.0
 
 # MLOps
+# mlflow kept: project mandates MLflow integration; model registry access at serving time
 mlflow>=2.18.0,<2.19.0
-optuna>=4.0,<5.0
+# Removed training-only: imbalanced-learn (SMOTE), shap (explanation), optuna (HPO)
 
 # Utilities
 python-dotenv>=1.0,<2.0
