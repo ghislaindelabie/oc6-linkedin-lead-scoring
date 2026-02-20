@@ -23,5 +23,5 @@ def test_openapi_schema(client):
     assert response.status_code == 200
     schema = response.json()
     assert schema["info"]["title"] == "LinkedIn Lead Scoring API"
-    assert schema["info"]["version"] == "0.1.0"
+    assert schema["info"]["version"] == "0.3.0"
     assert "/health" in schema["paths"]
