@@ -21,23 +21,25 @@ This project implements a complete MLOps pipeline for predicting LinkedIn lead e
 - **CI/CD pipeline** with GitHub Actions
 - **Deployment** to Hugging Face Spaces
 
-## Current Status (v0.2.0-dev)
+## Current Status (v0.3.0-dev)
 
 ✅ **Completed**:
 - Data preparation notebook with MLflow tracking
 - Model training notebook (baseline + tree models + Optuna tuning)
 - Hybrid environment setup (conda for scientific packages, uv for ML packages)
-- FastAPI skeleton (v0.1.0 deployed to HF Spaces)
+- FastAPI skeleton deployed to HF Spaces
+- Production model export pipeline (`scripts/export_model.py`)
+- Model artifacts committed: XGBoost model, preprocessor, feature columns
+- Drift detection reference dataset (`data/reference/training_reference.csv`)
 
-🚧 **In Progress**:
-- Model validation and performance testing
-- Feature engineering enhancements
-- Production model deployment
+🚧 **In Progress** (v0.3.0 parallel sessions):
+- Session A: CI/CD enhancements, Supabase DB, Docker update
+- Session B: Prediction API endpoint (`/predict`, `/batch-predict`)
+- Session C: Monitoring dashboard, drift detection
 
 📋 **Planned**:
 - LemList API integration for data collection
 - Automated retraining pipeline
-- Model monitoring and drift detection
 
 ## Quickstart
 
@@ -111,23 +113,29 @@ oc6-linkedin-lead-scoring/
 ├── src/linkedin_lead_scoring/        # Main package
 │   ├── api/                          # FastAPI application
 │   │   ├── main.py                   # API entry point
-│   │   └── static/                   # Static files for landing page
-│   ├── data/                         # Data processing
-│   │   └── utils_data.py             # MLflow-integrated data utilities
-│   ├── models/                       # Training & evaluation (planned)
-│   └── utils/                        # MLflow helpers (planned)
+│   │   └── schemas.py                # Pydantic request/response models
+│   ├── data/                         # Data processing utilities
+│   ├── db/                           # Database layer (Supabase/SQLAlchemy)
+│   ├── models/                       # Training & evaluation
+│   └── utils/                        # MLflow helpers
+├── scripts/
+│   └── export_model.py               # Re-train & export production artifacts
+├── model/                            # Committed production artifacts
+│   ├── xgboost_model.joblib          # Trained XGBoost classifier (47 features)
+│   ├── preprocessor.joblib           # Fitted TargetEncoder pipeline
+│   └── feature_columns.json          # Ordered feature column names
+├── data/
+│   └── reference/
+│       └── training_reference.csv    # 100-row baseline for drift detection
 ├── notebooks/                        # Jupyter notebooks with MLflow tracking
 │   ├── 01_linkedin_data_prep.ipynb   # Data preparation & feature engineering
 │   └── 02_linkedin_model_training.ipynb  # Model training & optimization
 ├── tests/                            # Test suite (pytest)
-├── data/                             # Raw data (not tracked in git)
-├── mlruns/                           # MLflow tracking data (not tracked in git)
-├── docs/                             # Documentation
-│   ├── PROJECT_SUMMARY.md            # Complete implementation guide
-│   ├── SETUP_ENVIRONMENT.md          # Environment setup instructions
-│   └── BRANCHING_STRATEGY.md         # Git workflow
+├── .github/workflows/                # CI/CD pipelines
 ├── environment.yml                   # Conda environment (scientific packages)
-├── pyproject.toml                    # uv dependencies (ML packages)
+├── pyproject.toml                    # Project dependencies
+├── requirements-prod.txt             # Pinned production dependencies
+├── Dockerfile                        # Container for HF Spaces deployment
 ├── setup_env.sh                      # Automated environment setup script
 └── README.md                         # This file
 ```
