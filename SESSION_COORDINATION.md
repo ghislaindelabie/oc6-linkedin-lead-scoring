@@ -12,7 +12,7 @@
 | **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
 | **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | Not started | — | — |
 | **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | Not started | — | — |
-| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | In progress | C.3 Performance profiling | C.2 done |
+| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | In progress | C.4 ONNX optimization | C.3 done |
 
 ## Merge Queue
 
@@ -66,7 +66,18 @@ When a session needs a new dependency, record it here. Session A will integrate.
 - **Tests**: `tests/test_monitoring.py` — 19 tests covering log parsing, simulation, metrics
 - **Note**: `httpx` already in `pyproject.toml`; `plotly` added to `requirements-streamlit.txt`
 
-### C.3 → C.6 — Pending
+### C.3 — Performance Profiling (complete)
+- **Created**: `src/linkedin_lead_scoring/monitoring/profiler.py`
+  - `profile_model_inference(model, X, n_calls)` — perf_counter timing, returns mean/p50/p95/p99
+  - `run_cprofile(model, X, n_calls)` — cProfile over predict_proba loop, returns stats string
+  - `save_profile_results(results, path)` — JSON output
+  - `format_profile_summary(results)` — human-readable table
+- **Created**: `scripts/profile_api.py` — CLI with `--mode model|api|both`; synthetic fallback model; async httpx for concurrent API load test; saves to `reports/`
+- **Created**: `notebooks/03_performance_analysis.ipynb` — baseline timing, distribution plots, cProfile section, ONNX comparison (reads C.4 output), findings/recommendations
+- **Tests**: `tests/test_profiler.py` — 12 tests (49 total)
+- **Known issue**: shared `oc6` conda env picks up whichever session's package was last installed; run `uv pip install -e .` from session-c root before testing
+
+### C.4 → C.6 — Pending
 Tasks being worked on in sequence per SESSION_C_TASKS.md.
 
 ## Notes
@@ -76,3 +87,4 @@ Tasks being worked on in sequence per SESSION_C_TASKS.md.
 - Opus reviews all PRs before merge
 - If you need a file owned by another session, create an interface/stub and document it here
 - **Session C note**: production log format (`logs/predictions.jsonl`) defined in SESSION_C_TASKS.md; will simulate if not yet created by Session B
+- **Worktree env collision**: the shared `oc6` conda env only holds one editable install at a time. Before running tests in any worktree, run `conda run -n oc6 uv pip install -e .` from that worktree root to re-point the env at the correct `src/`.
