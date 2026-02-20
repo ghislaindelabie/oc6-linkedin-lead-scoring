@@ -104,6 +104,47 @@ class TestPredictValidation:
         response = dev_client.post("/predict", json={"llm_quality": "high"})
         assert response.status_code == 422
 
+    def test_no_body_returns_422(self, dev_client):
+        """POST with no JSON body at all should fail."""
+        response = dev_client.post("/predict")
+        assert response.status_code == 422
+
+    def test_multiple_invalid_fields_returns_422(self, dev_client):
+        """Several invalid fields at once still 422."""
+        response = dev_client.post("/predict", json={
+            "llm_quality": 200,
+            "llm_engagement": -5.0,
+            "llm_company_fit": 10,
+        })
+        assert response.status_code == 422
+        # FastAPI reports multiple errors in the detail array
+        errors = response.json()["detail"]
+        assert len(errors) >= 2
+
+    def test_boundary_quality_0_accepted(self, dev_client):
+        response = dev_client.post("/predict", json={"llm_quality": 0})
+        assert response.status_code == 200
+
+    def test_boundary_quality_100_accepted(self, dev_client):
+        response = dev_client.post("/predict", json={"llm_quality": 100})
+        assert response.status_code == 200
+
+    def test_boundary_engagement_0_accepted(self, dev_client):
+        response = dev_client.post("/predict", json={"llm_engagement": 0.0})
+        assert response.status_code == 200
+
+    def test_boundary_engagement_1_accepted(self, dev_client):
+        response = dev_client.post("/predict", json={"llm_engagement": 1.0})
+        assert response.status_code == 200
+
+    def test_boundary_decision_maker_0_accepted(self, dev_client):
+        response = dev_client.post("/predict", json={"llm_decision_maker": 0.0})
+        assert response.status_code == 200
+
+    def test_boundary_decision_maker_1_accepted(self, dev_client):
+        response = dev_client.post("/predict", json={"llm_decision_maker": 1.0})
+        assert response.status_code == 200
+
 
 # ---------------------------------------------------------------------------
 # /predict — model not loaded → 503
@@ -222,6 +263,33 @@ class TestBatchPredictEndpoint:
         response = client.post("/predict/batch", json={"leads": [VALID_LEAD]})
         assert response.status_code == 503
 
+    def test_batch_over_10000_returns_422(self, dev_client):
+        """Endpoint-level check: >10000 leads rejected by Pydantic validation."""
+        payload = {"leads": [{}] * 10_001}
+        response = dev_client.post("/predict/batch", json=payload)
+        assert response.status_code == 422
+
+    def test_batch_with_invalid_lead_returns_422(self, dev_client):
+        """One bad apple spoils the batch — validation rejects the whole request."""
+        payload = {"leads": [VALID_LEAD, {"llm_quality": 999}]}
+        response = dev_client.post("/predict/batch", json=payload)
+        assert response.status_code == 422
+
     def test_batch_endpoint_in_openapi(self, dev_client):
         schema = dev_client.get("/openapi.json").json()
         assert "/predict/batch" in schema["paths"]
+
+
+# ---------------------------------------------------------------------------
+# mock_model fixture usage (Task B.5)
+# ---------------------------------------------------------------------------
+
+
+class TestMockModelFixture:
+    def test_mock_model_predict_returns_score(self, client, mock_model):
+        """The mock_model conftest fixture injects a FakeModel into _state."""
+        response = client.post("/predict", json=VALID_LEAD)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["score"] == pytest.approx(0.7, abs=0.01)
+        assert data["model_version"] == "test-0.0.0"

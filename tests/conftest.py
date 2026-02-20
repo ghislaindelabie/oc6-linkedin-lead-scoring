@@ -21,6 +21,30 @@ def dev_client(monkeypatch):
 
 
 @pytest.fixture
+def mock_model(monkeypatch):
+    """Patch predict module _state with a deterministic fake model.
+
+    Use this when you need fine-grained control over predicted scores.
+    For most endpoint tests, prefer dev_client which activates the built-in mock mode.
+    """
+    import numpy as np
+    import linkedin_lead_scoring.api.predict as predict_module
+
+    class FakeModel:
+        """Returns predict_proba = [[0.3, 0.7]] for every row."""
+
+        def predict_proba(self, X):
+            n = len(X) if hasattr(X, "__len__") and X is not None else 1
+            return np.array([[0.3, 0.7]] * n)
+
+    monkeypatch.setitem(predict_module._state, "model", FakeModel())
+    monkeypatch.setitem(predict_module._state, "model_loaded", True)
+    monkeypatch.setitem(predict_module._state, "is_mock", True)
+    monkeypatch.setitem(predict_module._state, "model_version", "test-0.0.0")
+    return FakeModel()
+
+
+@pytest.fixture
 def valid_lead():
     """Sample valid lead input dict."""
     return {

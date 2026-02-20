@@ -119,6 +119,33 @@ class TestLeadInput:
         assert lead.llm_seniority is None
         assert lead.jobtitle is None
 
+    def test_model_dump_round_trip_all_19_fields(self):
+        """All 19 feature fields should survive a model_dump round-trip."""
+        lead = LeadInput(**VALID_LEAD)
+        d = lead.model_dump()
+        assert len(d) == 19
+        lead2 = LeadInput(**d)
+        assert lead2 == lead
+
+    def test_llm_quality_boundary_0_and_100(self):
+        """Exact boundary values must be accepted."""
+        assert LeadInput(llm_quality=0).llm_quality == 0
+        assert LeadInput(llm_quality=100).llm_quality == 100
+
+    def test_llm_engagement_boundary_0_and_1(self):
+        assert LeadInput(llm_engagement=0.0).llm_engagement == 0.0
+        assert LeadInput(llm_engagement=1.0).llm_engagement == 1.0
+
+    def test_llm_company_fit_negative_rejected(self):
+        with pytest.raises(ValidationError):
+            LeadInput(llm_company_fit=-1)
+
+    def test_partial_numeric_only(self):
+        """Supply only some numeric fields, leave categorical/text as None."""
+        lead = LeadInput(llm_quality=50, llm_engagement=0.5)
+        assert lead.llm_quality == 50
+        assert lead.llm_seniority is None
+
 
 # ---------------------------------------------------------------------------
 # LeadPrediction — response schema
@@ -153,6 +180,26 @@ class TestLeadPrediction:
         pred = LeadPrediction(**VALID_PREDICTION)
         d = pred.model_dump()
         assert set(d.keys()) == {"score", "label", "confidence", "model_version", "inference_time_ms"}
+
+    def test_missing_score_raises(self):
+        """score is required — omitting it must raise."""
+        with pytest.raises(ValidationError):
+            LeadPrediction(label="engaged", confidence="high",
+                           model_version="0.3.0", inference_time_ms=1.0)
+
+    def test_missing_label_raises(self):
+        with pytest.raises(ValidationError):
+            LeadPrediction(score=0.5, confidence="high",
+                           model_version="0.3.0", inference_time_ms=1.0)
+
+    def test_missing_model_version_raises(self):
+        with pytest.raises(ValidationError):
+            LeadPrediction(score=0.5, label="engaged",
+                           confidence="high", inference_time_ms=1.0)
+
+    def test_negative_inference_time_rejected(self):
+        with pytest.raises(ValidationError):
+            LeadPrediction(**{**VALID_PREDICTION, "inference_time_ms": -1.0})
 
 
 # ---------------------------------------------------------------------------
