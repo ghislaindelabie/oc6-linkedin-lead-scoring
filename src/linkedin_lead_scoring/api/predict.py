@@ -6,11 +6,14 @@ In development mode (APP_ENV=development) with no model files, a deterministic
 mock model is used so the API can be exercised without real artifacts.
 """
 import json
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import pandas as pd
@@ -82,8 +85,8 @@ async def lifespan(app: FastAPI):
             _state["model_version"] = _MODEL_VERSION
             _state["model_loaded"] = True
             _state["is_mock"] = False
-        except Exception:
-            # Startup failure — model_loaded stays False → /predict returns 503
+        except Exception as exc:
+            logger.error("Failed to load model at startup: %s", exc)
             _state["model_loaded"] = False
 
     elif os.getenv("APP_ENV", "production") == "development":
@@ -123,14 +126,26 @@ def _lead_to_dataframe(lead: LeadInput) -> pd.DataFrame:
     return pd.DataFrame([lead.model_dump()])
 
 
+def _align_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Align DataFrame columns to the model's expected feature columns.
+
+    Adds missing columns as NaN and reorders to match training order.
+    """
+    feature_cols: list[str] = _state["feature_cols"]
+    for col in feature_cols:
+        if col not in df.columns:
+            df[col] = np.nan
+    return df[feature_cols]
+
+
 def is_model_loaded() -> bool:
     """Return True if the model is ready to serve predictions."""
     return _state["model_loaded"]
 
 
-def _log_prediction(lead: LeadInput, prediction: LeadPrediction) -> None:
-    """Append one prediction entry to the predictions log. Non-blocking."""
-    entry = {
+def _build_log_entry(lead: LeadInput, prediction: LeadPrediction) -> dict:
+    """Build a single prediction log entry."""
+    return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "input": lead.model_dump(exclude_none=True),
         "score": prediction.score,
@@ -138,11 +153,23 @@ def _log_prediction(lead: LeadInput, prediction: LeadPrediction) -> None:
         "inference_ms": prediction.inference_time_ms,
         "model_version": prediction.model_version,
     }
+
+
+def _log_prediction(lead: LeadInput, prediction: LeadPrediction) -> None:
+    """Append one prediction entry to the predictions log. Non-blocking."""
+    _log_predictions([(lead, prediction)])
+
+
+def _log_predictions(pairs: list[tuple[LeadInput, LeadPrediction]]) -> None:
+    """Append multiple prediction entries in a single file write."""
+    if not pairs:
+        return
+    lines = [json.dumps(_build_log_entry(lead, pred)) + "\n" for lead, pred in pairs]
     try:
         log_path = _PREDICTIONS_LOG
         os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
+            f.writelines(lines)
     except Exception:
         pass  # log failures must never crash the endpoint
 
@@ -175,13 +202,7 @@ async def predict(lead: LeadInput) -> LeadPrediction:
             proba = _state["model"].predict_proba(None)
             score = float(proba[0, 1])
         else:
-            df = _lead_to_dataframe(lead)
-            # Keep only the columns the model was trained on; fill missing with NaN
-            feature_cols: list[str] = _state["feature_cols"]
-            for col in feature_cols:
-                if col not in df.columns:
-                    df[col] = np.nan
-            df = df[feature_cols]
+            df = _align_features(_lead_to_dataframe(lead))
             X = _state["preprocessor"].transform(df)
             proba = _state["model"].predict_proba(X)
             score = float(proba[0, 1])
@@ -235,12 +256,7 @@ async def predict_batch(request: BatchPredictionRequest) -> BatchPredictionRespo
             probas = _state["model"].predict_proba(leads)
             scores = probas[:, 1].tolist()
         else:
-            df = pd.DataFrame([lead.model_dump() for lead in leads])
-            feature_cols: list[str] = _state["feature_cols"]
-            for col in feature_cols:
-                if col not in df.columns:
-                    df[col] = np.nan
-            df = df[feature_cols]
+            df = _align_features(pd.DataFrame([lead.model_dump() for lead in leads]))
             X = _state["preprocessor"].transform(df)
             probas = _state["model"].predict_proba(X)
             scores = probas[:, 1].tolist()
@@ -262,8 +278,7 @@ async def predict_batch(request: BatchPredictionRequest) -> BatchPredictionRespo
         avg_score = round(sum(scores) / n, 4)
         high_engagement_count = sum(1 for s in scores if s >= 0.5)
 
-        for lead, pred in zip(leads, predictions):
-            _log_prediction(lead, pred)
+        _log_predictions(list(zip(leads, predictions)))
 
         return BatchPredictionResponse(
             predictions=predictions,

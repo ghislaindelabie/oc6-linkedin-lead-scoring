@@ -2,6 +2,8 @@
 FastAPI application for LinkedIn lead scoring.
 v0.3.0 — adds /predict endpoint with model-at-startup loading pattern.
 """
+import os
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,11 +29,12 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 # Middleware stack (Starlette processes outermost-added first on response)
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8501,http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tightened per environment in production via env var
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["POST", "GET", "OPTIONS"],
     allow_headers=["*"],
 )
 app.add_middleware(RequestIDMiddleware)

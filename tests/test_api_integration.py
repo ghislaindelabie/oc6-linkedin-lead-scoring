@@ -211,10 +211,7 @@ def test_predict_response_has_rate_limit_headers(dev_client):
     """Prediction responses include rate limiting info headers."""
     response = dev_client.post("/predict", json=VALID_LEAD)
     assert "x-ratelimit-limit" in response.headers
-    assert "x-ratelimit-remaining" in response.headers
-    # Values should be parseable as integers
     assert int(response.headers["x-ratelimit-limit"]) > 0
-    assert int(response.headers["x-ratelimit-remaining"]) >= 0
 
 
 @pytest.mark.integration
@@ -222,7 +219,6 @@ def test_batch_response_has_rate_limit_headers(dev_client):
     """Batch prediction responses also include rate limiting headers."""
     response = dev_client.post("/predict/batch", json={"leads": [VALID_LEAD]})
     assert "x-ratelimit-limit" in response.headers
-    assert "x-ratelimit-remaining" in response.headers
 
 
 # ---------------------------------------------------------------------------

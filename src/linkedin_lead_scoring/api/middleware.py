@@ -31,8 +31,13 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     Otherwise a new UUID4 is generated.
     """
 
+    _MAX_ID_LENGTH = 128
+
     async def dispatch(self, request: Request, call_next) -> Response:
-        request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        raw_id = request.headers.get("x-request-id") or ""
+        # Sanitize: ASCII-only, truncate to 128 chars
+        sanitized = raw_id[:self._MAX_ID_LENGTH] if raw_id.isascii() and raw_id else ""
+        request_id = sanitized or str(uuid.uuid4())
         # Store on request state so other middleware / handlers can access it
         request.state.request_id = request_id
         response = await call_next(request)
@@ -50,7 +55,7 @@ class RateLimitHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
-        response.headers["X-RateLimit-Remaining"] = str(_RATE_LIMIT)
+        # X-RateLimit-Remaining omitted — actual tracking delegated to API gateway
         return response
 
 

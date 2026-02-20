@@ -1,5 +1,5 @@
 """Pydantic models for API request/response validation"""
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -89,16 +89,19 @@ class LeadInput(BaseModel):
     # Text features
     summary: Optional[str] = Field(
         None,
+        max_length=10_000,
         description="Professional summary text",
         examples=["Experienced SaaS executive with 10+ years in B2B sales."],
     )
     skills: Optional[str] = Field(
         None,
+        max_length=5_000,
         description="Comma-separated list of skills",
         examples=["Leadership, SaaS, B2B Sales"],
     )
     jobtitle: Optional[str] = Field(
         None,
+        max_length=500,
         description="Current job title",
         examples=["VP of Sales"],
     )
@@ -113,14 +116,14 @@ class LeadPrediction(BaseModel):
     """Single prediction response."""
 
     score: float = Field(..., ge=0.0, le=1.0, description="Engagement probability (0-1)")
-    label: str = Field(..., description="'engaged' or 'not_engaged'")
-    confidence: str = Field(..., description="Confidence level: low / medium / high")
+    label: Literal["engaged", "not_engaged"] = Field(..., description="'engaged' or 'not_engaged'")
+    confidence: Literal["low", "medium", "high"] = Field(..., description="Confidence level: low / medium / high")
     model_version: str = Field(..., description="Model version used for this prediction")
     inference_time_ms: float = Field(..., ge=0.0, description="Inference time in milliseconds")
 
 
 class BatchPredictionRequest(BaseModel):
-    """Batch prediction request — 1 to 100 leads."""
+    """Batch prediction request — 1 to 10,000 leads."""
 
     leads: list[LeadInput] = Field(
         ..., min_length=1, max_length=10_000, description="List of leads to score (max 10 000)"
