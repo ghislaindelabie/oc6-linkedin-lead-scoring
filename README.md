@@ -187,9 +187,12 @@ Automatic deployment to HF Spaces on push to `main` branch (after tests pass).
   - Auto-deploy to Hugging Face Spaces on merge to main
   - Git Flow branching strategy for organized releases
 
-- **Model Monitoring:** (Planned)
-  - Database logging for predictions (GDPR-compliant)
-  - Drift detection and performance monitoring
+- **Model Monitoring:** ✅ Implemented (v0.3.0)
+  - Evidently AI drift detection (data drift + prediction score drift)
+  - Streamlit monitoring dashboard (`streamlit_app.py`) with live metrics
+  - ONNX Runtime optimization: 26.5× inference speedup over joblib
+  - Performance profiling with cProfile and tracemalloc
+  - See `docs/MONITORING_GUIDE.md` and `docs/PERFORMANCE_REPORT.md`
 
 ## License
 

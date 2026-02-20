@@ -12,7 +12,7 @@
 | **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Setup complete | `0be90e2` |
 | **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | Not started | — | — |
 | **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | Not started | — | — |
-| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | In progress | C.6 docs | C.5 done |
+| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | **Complete** | PR to v0.3.0 | C.6 done |
 
 ## Merge Queue
 
@@ -104,8 +104,26 @@ When a session needs a new dependency, record it here. Session A will integrate.
 - **Total**: 72 tests, 99.55% coverage on monitoring package (was 95.07% after C.4)
 - **Remaining uncovered**: `onnx_optimizer.py` line 124 (dict-based ORT proba output — defensive branch, never triggered by current ORT version)
 
-### C.6 — Pending
-`docs/PERFORMANCE_REPORT.md` and `docs/MONITORING_GUIDE.md` — next task.
+### C.6 — Performance Report and Monitoring Guide (complete)
+- **Created**: `docs/PERFORMANCE_REPORT.md`
+  - Real benchmark data from `scripts/optimize_model.py` (500-call run)
+  - Baseline: joblib mean 0.212 ms, p95 0.266 ms, memory 0.044 MB
+  - ONNX: mean 0.008 ms, p95 0.005 ms, memory 0.001 MB — 26.5× speedup
+  - cProfile analysis showing C++ engine dominates; Python overhead negligible
+  - 5 production recommendations (deploy ONNX, keep joblib fallback, CI/CD regeneration, batch scoring, dashboard alerting)
+- **Created**: `docs/MONITORING_GUIDE.md`
+  - Dashboard access (local Streamlit + Docker/HF Spaces)
+  - Metric interpretation tables with green/yellow/red thresholds
+  - Drift indicator guide (covariate shift vs concept drift)
+  - Retrain triggers (5 criteria with measurable thresholds)
+  - Full alert threshold table with severity and owner
+  - Log format reference and useful CLI commands
+- **Created**: `tests/test_docs.py` — 14 structural tests verifying both docs exist and contain required sections
+- **Generated**: `reports/onnx_benchmark.json`, `reports/cprofile_onnx_stats.txt` (supporting data)
+- **Updated**: `README.md` monitoring section from "(Planned)" to implemented with capabilities list
+- **Total tests**: 86 (was 72), coverage 99.55%
+
+### Session C — All tasks complete. PR ready for v0.3.0.
 
 ## Notes
 
