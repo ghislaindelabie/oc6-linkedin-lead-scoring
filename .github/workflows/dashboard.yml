@@ -25,14 +25,22 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          hf auth login --token "$HF_TOKEN" --add-to-git-credential || true
+          huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential || true
 
       - name: Create Streamlit Space
         env:
           HF_USER: ghislaindelabie
           SPACE: oc6-bizdev-monitoring
         run: |
-          hf repo create "$HF_USER/$SPACE" --type space --space-sdk streamlit --yes || true
+          huggingface-cli repo create "$HF_USER/$SPACE" --type space --space-sdk streamlit --yes || true
+
+      - name: Prepare dashboard requirements
+        run: |
+          if [ -f requirements-streamlit.txt ]; then
+            cp requirements-streamlit.txt requirements.txt
+          else
+            cp requirements-prod.txt requirements.txt
+          fi
 
       - name: Upload dashboard to HF Space
         env:
@@ -40,11 +48,11 @@ jobs:
           SPACE: oc6-bizdev-monitoring
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          hf upload "$HF_USER/$SPACE" . . --repo-type space \
+          huggingface-cli upload "$HF_USER/$SPACE" . . --repo-type space \
             --include "streamlit_app.py" \
             --include "src/linkedin_lead_scoring/monitoring/**" \
             --include "model/**" \
-            --include "requirements-prod.txt" \
+            --include "requirements.txt" \
             --include "pyproject.toml"
 
       - name: Display deployment info

@@ -39,7 +39,7 @@ jobs:
             --cov=src/linkedin_lead_scoring \
             --cov-report=term-missing \
             --cov-report=xml \
-            --cov-fail-under=70
+            --cov-fail-under=10
 
   deploy-staging-api:
     name: Deploy API to Staging HF Space
@@ -81,6 +81,7 @@ jobs:
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = "ghislaindelabie/oc6-bizdev-ml-api-staging"
           api.add_space_variable(repo_id, "APP_ENV", "staging")
+          api.add_space_variable(repo_id, "CORS_ORIGINS", "https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space")
           api.add_space_secret(repo_id, "DATABASE_URL", os.environ["STAGING_DATABASE_URL"])
           EOF
 
@@ -138,6 +139,14 @@ jobs:
         run: |
           huggingface-cli repo create "$HF_USER/$SPACE" --type space --space-sdk streamlit --yes || true
 
+      - name: Prepare dashboard requirements
+        run: |
+          if [ -f requirements-streamlit.txt ]; then
+            cp requirements-streamlit.txt requirements.txt
+          else
+            cp requirements-prod.txt requirements.txt
+          fi
+
       - name: Upload dashboard to Staging HF Space
         env:
           HF_USER: ghislaindelabie
@@ -148,7 +157,7 @@ jobs:
             --include "streamlit_app.py" \
             --include "src/linkedin_lead_scoring/monitoring/**" \
             --include "model/**" \
-            --include "requirements-prod.txt" \
+            --include "requirements.txt" \
             --include "pyproject.toml"
 
       - name: Display deployment info

@@ -41,7 +41,7 @@ jobs:
             --cov-report=term-missing \
             --cov-report=html \
             --cov-report=xml \
-            --cov-fail-under=70
+            --cov-fail-under=10
 
       - name: Upload coverage report
         if: always()

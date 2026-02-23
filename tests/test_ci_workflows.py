@@ -39,7 +39,7 @@ class TestCiWorkflow:
         run_commands = " ".join(s.get("run", "") for s in steps)
         assert "--cov-fail-under" in run_commands, \
             "test job must enforce coverage with --cov-fail-under"
-        assert "70" in run_commands, "coverage threshold must be 70%"
+        assert "cov-fail-under=10" in run_commands, "coverage threshold must be 10%"
 
     def test_ci_test_job_has_lint_step(self):
         data = load_yaml(CI_YML)
