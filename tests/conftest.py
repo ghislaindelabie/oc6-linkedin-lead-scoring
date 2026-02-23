@@ -9,6 +9,7 @@ from linkedin_lead_scoring.api.main import app
 def client(monkeypatch):
     """Test client with lifespan — no model files, no dev mode → model_loaded=False."""
     import linkedin_lead_scoring.api.predict as predict_module
+    monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setattr(predict_module, "_MODEL_PATH", "/nonexistent/model.joblib")
     with TestClient(app) as c:
         yield c
