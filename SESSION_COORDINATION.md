@@ -1,7 +1,7 @@
 # Session Coordination — OC8 Parallel Development
 
 **Version branch**: `v0.3.0`
-**Last updated**: 2026-02-20 (All sessions complete — PRs A, B, C ready to merge into v0.3.0)
+**Last updated**: 2026-02-23 (Merging PRs progressively into v0.3.0)
 
 ---
 
@@ -9,10 +9,10 @@
 
 | Session | Branch | Worktree | Status | Current Task | Last Commit |
 |---------|--------|----------|--------|--------------|-------------|
-| **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Merge PRs | `0be90e2` |
-| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | **Done — PR ready** | — | All tasks + review fixes + staging |
-| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | **Done — PR ready** | — | — |
-| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | **Done — PR ready** | — | — |
+| **Opus** (Coordinator) | `v0.3.0` | main repo | Active | Merging PRs | Progressive merge |
+| **A** (Infra/CI/CD) | `feature/infra-cicd` | `worktrees/session-a` | **Merged** (PR #5) | — | All tasks done |
+| **B** (API/Tests) | `feature/api-scoring` | `worktrees/session-b` | **Merging** (PR #6) | All B.1–B.7 done | 109 tests |
+| **C** (Monitoring/Drift) | `feature/monitoring` | `worktrees/session-c` | **Pending** (PR #7) | — | — |
 
 ## Merge Queue
 
@@ -26,17 +26,14 @@
 
 | Dependency | Provider | Consumer(s) | Status |
 |------------|----------|-------------|--------|
-| Model artifact (`model/*.joblib`) | Session A | B, C | **Ready** (A.2) |
-| Feature columns (`model/feature_columns.json`) | Session A | B, C | **Ready** (A.2) — 47 features |
-| Reference data (`data/reference/`) | Session A | C | **Ready** (A.2) — 100 rows |
-| DB module (`src/.../db/`) | Session A | B (logging) | **Ready** (A.3) — `get_db()` dep, `log_prediction()`, `log_api_metric()` |
-| Alembic migrations (`alembic/`) | Session A | Deploy | **Ready** (A.3) — run `alembic upgrade head` before first deploy |
-| CI/CD: lint + test + coverage (`.github/workflows/ci.yml`) | Session A | All | **Ready** (A.5) — ruff, pytest, 70% coverage gate, docker-build on PRs |
-| CI/CD: security scan (`.github/workflows/security.yml`) | Session A | All | **Ready** (A.5) — pip-audit + bandit weekly, artifacts uploaded |
-| CI/CD: dashboard deploy (`.github/workflows/dashboard.yml`) | Session A | C | **Ready** (A.5) — deploys streamlit_app.py to oc6-bizdev-monitoring on push to main |
-| CI/CD: staging deploy (`.github/workflows/staging.yml`) | Session A | All | **Ready** (S1) — deploys API + dashboard to `-staging` HF Spaces on push to `v*.*.*` branches; requires `STAGING_DATABASE_URL` secret |
-| API schemas finalized | Session B | C (for monitoring) | **Ready** (PR B) |
-| Production logging format | Session B | C (for drift analysis) | **Ready** (PR B) |
+| Model artifact (`model/*.joblib`) | Session A | B, C | **Merged** (A.2) |
+| Feature columns (`model/feature_columns.json`) | Session A | B, C | **Merged** (A.2) — 47 features |
+| Reference data (`data/reference/`) | Session A | C | **Merged** (A.2) — 100 rows |
+| DB module (`src/.../db/`) | Session A | B (logging) | **Merged** (A.3) |
+| Alembic migrations (`alembic/`) | Session A | Deploy | **Merged** (A.3) |
+| CI/CD workflows | Session A | All | **Merged** (A.5) — fixed for Python API deploy |
+| API schemas finalized | Session B | C (for monitoring) | **Done** (B.1) |
+| Production logging format | Session B | C (for drift analysis) | **Done** (B.4) |
 
 ## Shared Dependencies (pyproject.toml additions)
 
