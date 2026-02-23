@@ -1,12 +1,11 @@
 """Database layer: Supabase PostgreSQL via async SQLAlchemy."""
 from linkedin_lead_scoring.db.connection import (
     AsyncSessionLocal,
-    Base,
     DATABASE_URL,
     async_engine,
     get_db,
 )
-from linkedin_lead_scoring.db.models import ApiMetric, PredictionLog
+from linkedin_lead_scoring.db.models import ApiMetric, Base, PredictionLog
 
 __all__ = [
     "async_engine",
