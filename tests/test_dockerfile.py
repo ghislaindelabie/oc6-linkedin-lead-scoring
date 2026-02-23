@@ -1,0 +1,97 @@
+"""Tests for Dockerfile correctness (static analysis — no docker build required)."""
+from pathlib import Path
+
+import pytest
+
+DOCKERFILE_PATH = Path(__file__).parent.parent / "Dockerfile"
+
+
+@pytest.fixture(scope="module")
+def dockerfile_content() -> str:
+    """Read the Dockerfile once for all tests in this module."""
+    return DOCKERFILE_PATH.read_text()
+
+
+@pytest.fixture(scope="module")
+def dockerfile_lines(dockerfile_content) -> list[str]:
+    return dockerfile_content.splitlines()
+
+
+class TestDockerfileStructure:
+    def test_dockerfile_exists(self):
+        assert DOCKERFILE_PATH.exists(), "Dockerfile must exist at project root"
+
+    def test_copies_src_directory(self, dockerfile_content):
+        assert "COPY src/" in dockerfile_content, "Dockerfile must COPY src/ into the image"
+
+    def test_copies_model_directory(self, dockerfile_content):
+        assert "COPY model/" in dockerfile_content, "Dockerfile must COPY model/ into the image"
+
+    def test_copies_pyproject_toml(self, dockerfile_content):
+        assert "COPY pyproject.toml" in dockerfile_content, \
+            "Dockerfile must COPY pyproject.toml (needed for pip install .)"
+
+    def test_installs_package_in_production_mode(self, dockerfile_content):
+        assert "pip install --no-cache-dir ." in dockerfile_content, \
+            "Dockerfile must install the package with 'pip install --no-cache-dir .' (not editable)"
+        assert "pip install --no-cache-dir -e ." not in dockerfile_content, \
+            "Dockerfile must NOT use editable mode (-e) in production"
+
+
+class TestDockerfileCmd:
+    def test_cmd_uses_installed_package_path(self, dockerfile_content):
+        """CMD must reference linkedin_lead_scoring.api.main, not src.linkedin_lead_scoring."""
+        assert "linkedin_lead_scoring.api.main:app" in dockerfile_content, \
+            "CMD must use the installed module path 'linkedin_lead_scoring.api.main:app'"
+
+    def test_cmd_does_not_use_src_prefix(self, dockerfile_content):
+        """src. prefix fails when package is installed — must be removed."""
+        assert "src.linkedin_lead_scoring.api.main" not in dockerfile_content, \
+            "CMD must NOT use 'src.linkedin_lead_scoring.api.main' (package is installed)"
+
+    def test_cmd_uses_correct_port(self, dockerfile_content):
+        assert "--port" in dockerfile_content and "7860" in dockerfile_content, \
+            "CMD must bind to port 7860 (HF Spaces requirement)"
+
+    def test_cmd_binds_to_all_interfaces(self, dockerfile_content):
+        assert "0.0.0.0" in dockerfile_content, \
+            "CMD must bind to 0.0.0.0 for container networking"
+
+
+class TestDockerfileHealthcheck:
+    def test_healthcheck_is_present(self, dockerfile_content):
+        assert "HEALTHCHECK" in dockerfile_content, "Dockerfile must define a HEALTHCHECK"
+
+    def test_healthcheck_does_not_use_requests_library(self, dockerfile_content):
+        """requests is not in requirements-prod.txt — healthcheck must use stdlib."""
+        # Extract just the HEALTHCHECK line(s)
+        hc_lines = [l for l in dockerfile_content.splitlines() if "HEALTHCHECK" in l or
+                    (dockerfile_content.splitlines().index(l) > 0 and
+                     "HEALTHCHECK" in dockerfile_content.splitlines()[
+                         dockerfile_content.splitlines().index(l) - 1])]
+        # Simple check: 'import requests' must not appear in HEALTHCHECK context
+        hc_block = dockerfile_content[dockerfile_content.find("HEALTHCHECK"):]
+        # Only look at text until the next Dockerfile instruction
+        next_instr = -1
+        for keyword in ["CMD", "RUN", "COPY", "ENV", "EXPOSE", "USER", "FROM", "ARG"]:
+            idx = hc_block.find(f"\n{keyword}", 1)
+            if idx != -1 and (next_instr == -1 or idx < next_instr):
+                next_instr = idx
+        hc_section = hc_block[:next_instr] if next_instr != -1 else hc_block
+        assert "import requests" not in hc_section, \
+            "HEALTHCHECK must not use 'import requests' (not in requirements-prod.txt)"
+
+    def test_healthcheck_checks_health_endpoint(self, dockerfile_content):
+        assert "/health" in dockerfile_content, \
+            "HEALTHCHECK must probe the /health endpoint"
+
+
+class TestDockerfileAlembic:
+    def test_runs_alembic_migrations_before_startup(self, dockerfile_content):
+        """alembic upgrade head must run before uvicorn starts."""
+        alembic_pos = dockerfile_content.find("alembic upgrade head")
+        uvicorn_pos = dockerfile_content.find("uvicorn")
+        assert alembic_pos != -1, \
+            "Dockerfile must run 'alembic upgrade head' before starting the server"
+        assert alembic_pos < uvicorn_pos, \
+            "'alembic upgrade head' must appear before 'uvicorn' in the Dockerfile"
