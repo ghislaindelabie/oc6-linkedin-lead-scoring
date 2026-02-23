@@ -54,6 +54,3 @@ htmlcov/
 # Documentation (local only)
 docs/notes/
 docs/session log.md
-
-# Alembic
-alembic.ini
