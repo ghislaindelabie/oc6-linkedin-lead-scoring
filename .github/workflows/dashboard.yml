@@ -29,20 +29,41 @@ jobs:
             cp requirements-prod.txt requirements.txt
           fi
 
+      - name: Prepare Space README with Streamlit SDK metadata
+        run: |
+          cat > /tmp/hf_space_readme.md <<'READMEEOF'
+          ---
+          title: OC6 BizDev Monitoring
+          emoji: 📊
+          colorFrom: blue
+          colorTo: purple
+          sdk: streamlit
+          sdk_version: "1.30.0"
+          app_file: streamlit_app.py
+          pinned: false
+          ---
+          READMEEOF
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' /tmp/hf_space_readme.md
+
       - name: Create Space and upload dashboard
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python - <<'PYEOF'
           import os
+          import shutil
           from huggingface_hub import HfApi
 
           token = os.environ["HF_TOKEN"]
           api = HfApi(token=token)
           repo_id = "ghislaindelabie/oc6-bizdev-monitoring"
 
-          # Create Space (idempotent)
-          api.create_repo(repo_id, repo_type="space", space_sdk="streamlit", exist_ok=True)
+          # Create Space (use static, metadata in README sets streamlit)
+          api.create_repo(repo_id, repo_type="space", space_sdk="static", exist_ok=True)
+
+          # Copy Space README to working dir for upload
+          shutil.copy("/tmp/hf_space_readme.md", "README.md")
 
           # Upload dashboard files
           api.upload_folder(
@@ -50,6 +71,7 @@ jobs:
               repo_id=repo_id,
               repo_type="space",
               allow_patterns=[
+                  "README.md",
                   "streamlit_app.py",
                   "src/linkedin_lead_scoring/monitoring/**",
                   "model/**",
