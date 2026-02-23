@@ -5,27 +5,22 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies and Python packages in a single layer
+COPY requirements-prod.txt .
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libgomp1 \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements-prod.txt
 
-# Install Python dependencies from pinned requirements
-COPY requirements-prod.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-prod.txt
-
-# Copy project files
-COPY src/ ./src/
-COPY model/ ./model/
-COPY alembic/ ./alembic/
-COPY alembic.ini .
-
-# Make app directory writable for HF Spaces runtime user
-RUN chmod -R 777 /app
+# Copy project files — use --chmod so no separate RUN step is needed
+COPY --chmod=777 src/ ./src/
+COPY --chmod=777 model/ ./model/
+COPY --chmod=777 alembic/ ./alembic/
+COPY --chmod=777 alembic.ini .
 
 # Expose HF Spaces port
 EXPOSE 7860

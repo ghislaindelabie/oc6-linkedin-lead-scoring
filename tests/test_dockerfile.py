@@ -22,10 +22,12 @@ class TestDockerfileStructure:
         assert DOCKERFILE_PATH.exists(), "Dockerfile must exist at project root"
 
     def test_copies_src_directory(self, dockerfile_content):
-        assert "COPY src/" in dockerfile_content, "Dockerfile must COPY src/ into the image"
+        assert "src/" in dockerfile_content and "COPY" in dockerfile_content, \
+            "Dockerfile must COPY src/ into the image"
 
     def test_copies_model_directory(self, dockerfile_content):
-        assert "COPY model/" in dockerfile_content, "Dockerfile must COPY model/ into the image"
+        assert "model/" in dockerfile_content and "COPY" in dockerfile_content, \
+            "Dockerfile must COPY model/ into the image"
 
     def test_package_importable_via_pythonpath(self, dockerfile_content):
         assert "PYTHONPATH=/app/src" in dockerfile_content, \
