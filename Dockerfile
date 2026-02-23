@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Dockerfile for HF Spaces deployment
 # Optimized for FastAPI deployment with ML model
 
