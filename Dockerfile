@@ -1,27 +1,36 @@
-# syntax=docker/dockerfile:1
 # Dockerfile for HF Spaces deployment
-# Optimized for FastAPI deployment with ML model
+# Follows HF Spaces Docker permissions pattern:
+# https://huggingface.co/docs/hub/en/spaces-sdks-docker
 
 FROM python:3.11-slim
 
-WORKDIR /app
-
-# Install system dependencies and Python packages in a single layer
-COPY requirements-prod.txt .
+# Install system dependencies as root
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libgomp1 \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements-prod.txt
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy project files — use --chmod so no separate RUN step is needed
-COPY --chmod=777 src/ ./src/
-COPY --chmod=777 model/ ./model/
-COPY --chmod=777 alembic/ ./alembic/
-COPY --chmod=777 alembic.ini .
+# Create non-root user (HF Spaces expects UID 1000)
+RUN useradd -m -u 1000 user
+USER user
+
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+WORKDIR $HOME/app
+
+# Install Python dependencies as user
+COPY --chown=user requirements-prod.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-prod.txt
+
+# Copy project files
+COPY --chown=user src/ ./src/
+COPY --chown=user model/ ./model/
+COPY --chown=user alembic/ ./alembic/
+COPY --chown=user alembic.ini .
 
 # Expose HF Spaces port
 EXPOSE 7860
@@ -31,7 +40,7 @@ EXPOSE 7860
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     APP_ENV=production \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/home/user/app/src
 
 # Health check using stdlib urllib (no requests library needed)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
