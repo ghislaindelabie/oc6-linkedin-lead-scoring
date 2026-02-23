@@ -24,10 +24,8 @@ COPY model/ ./model/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
 
-# Create non-root user (HF Spaces expects UID 1000)
-RUN useradd -m -u 1000 apiuser || true
-RUN chown -R 1000:1000 /app
-USER 1000
+# Make app directory writable for HF Spaces runtime user
+RUN chmod -R 777 /app
 
 # Expose HF Spaces port
 EXPOSE 7860
