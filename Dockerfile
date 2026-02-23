@@ -18,17 +18,11 @@ COPY requirements-prod.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-prod.txt
 
-# Copy project files and install the package
-COPY pyproject.toml .
-COPY README.md .
+# Copy project files
 COPY src/ ./src/
 COPY model/ ./model/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
-
-# Install the package (production mode — not editable, no deps since
-# requirements-prod.txt already provides all runtime dependencies)
-RUN pip install --no-cache-dir --no-deps .
 
 # Create non-root user
 RUN useradd -m -u 1000 apiuser && \
@@ -38,10 +32,12 @@ USER apiuser
 # Expose HF Spaces port
 EXPOSE 7860
 
-# Environment variables
+# Environment variables — PYTHONPATH makes the package importable
+# without pip install (all runtime deps come from requirements-prod.txt)
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    APP_ENV=production
+    APP_ENV=production \
+    PYTHONPATH=/app/src
 
 # Health check using stdlib urllib (no requests library needed)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

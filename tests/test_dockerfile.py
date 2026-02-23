@@ -27,15 +27,9 @@ class TestDockerfileStructure:
     def test_copies_model_directory(self, dockerfile_content):
         assert "COPY model/" in dockerfile_content, "Dockerfile must COPY model/ into the image"
 
-    def test_copies_pyproject_toml(self, dockerfile_content):
-        assert "COPY pyproject.toml" in dockerfile_content, \
-            "Dockerfile must COPY pyproject.toml (needed for pip install .)"
-
-    def test_installs_package_in_production_mode(self, dockerfile_content):
-        assert "pip install --no-cache-dir --no-deps ." in dockerfile_content, \
-            "Dockerfile must install the package with 'pip install --no-cache-dir --no-deps .' (not editable)"
-        assert "pip install --no-cache-dir -e ." not in dockerfile_content, \
-            "Dockerfile must NOT use editable mode (-e) in production"
+    def test_package_importable_via_pythonpath(self, dockerfile_content):
+        assert "PYTHONPATH=/app/src" in dockerfile_content, \
+            "Dockerfile must set PYTHONPATH=/app/src so the package is importable"
 
 
 class TestDockerfileCmd:
