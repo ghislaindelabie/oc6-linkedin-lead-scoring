@@ -20,5 +20,3 @@ data/*.json
 .env
 .env.*
 .DS_Store
-alembic.ini
-alembic/
