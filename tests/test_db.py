@@ -4,9 +4,7 @@ Uses an in-memory SQLite database via aiosqlite for fast, isolated tests.
 No external Supabase connection required.
 """
 import uuid
-from datetime import datetime, timezone
 
-import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker

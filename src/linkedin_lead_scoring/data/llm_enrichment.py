@@ -7,7 +7,7 @@ with automatic batching, JSON-formatted outputs, and MLflow tracking.
 
 import os
 import time
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 import json
 
 import pandas as pd
@@ -210,7 +210,7 @@ class OpenAIEnricher:
         except KeyError:
             self.encoding = tiktoken.get_encoding("cl100k_base")
 
-        print(f"✓ OpenAI Enricher initialized")
+        print("✓ OpenAI Enricher initialized")
         print(f"  Model: {model}")
         print(f"  Max cost limit: ${max_cost_usd:.2f}")
 

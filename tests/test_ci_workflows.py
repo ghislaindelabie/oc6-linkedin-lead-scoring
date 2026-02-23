@@ -1,7 +1,6 @@
 """Static validation tests for GitHub Actions workflow YAML files."""
 from pathlib import Path
 
-import pytest
 import yaml
 
 WORKFLOWS_DIR = Path(__file__).parent.parent / ".github" / "workflows"

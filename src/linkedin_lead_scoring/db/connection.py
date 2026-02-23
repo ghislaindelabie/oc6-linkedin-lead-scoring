@@ -10,7 +10,6 @@ from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from linkedin_lead_scoring.db.models import Base
 
 # ---------------------------------------------------------------------------
 # Resolve DATABASE_URL

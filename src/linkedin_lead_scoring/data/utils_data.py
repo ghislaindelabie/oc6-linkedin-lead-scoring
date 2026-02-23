@@ -72,7 +72,7 @@ def configure_mlflow_tracking(tracking_dir: str = "mlruns") -> Path:
     tracking_uri = tracking_path.as_uri()
     mlflow.set_tracking_uri(tracking_uri)
 
-    print(f"✓ MLflow tracking configured")
+    print("✓ MLflow tracking configured")
     print(f"  Project root: {project_root}")
     print(f"  Tracking URI: {tracking_uri}")
 
@@ -596,9 +596,11 @@ def suggest_correlated_features(
         if a in protected and b in protected:
             continue
         if a in protected:
-            to_drop.add(b); continue
+            to_drop.add(b)
+            continue
         if b in protected:
-            to_drop.add(a); continue
+            to_drop.add(a)
+            continue
         drop_candidate = a if mean_abs[a] >= mean_abs[b] else b
         to_drop.add(drop_candidate)
 

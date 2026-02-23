@@ -64,11 +64,6 @@ class TestDockerfileHealthcheck:
 
     def test_healthcheck_does_not_use_requests_library(self, dockerfile_content):
         """requests is not in requirements-prod.txt — healthcheck must use stdlib."""
-        # Extract just the HEALTHCHECK line(s)
-        hc_lines = [l for l in dockerfile_content.splitlines() if "HEALTHCHECK" in l or
-                    (dockerfile_content.splitlines().index(l) > 0 and
-                     "HEALTHCHECK" in dockerfile_content.splitlines()[
-                         dockerfile_content.splitlines().index(l) - 1])]
         # Simple check: 'import requests' must not appear in HEALTHCHECK context
         hc_block = dockerfile_content[dockerfile_content.find("HEALTHCHECK"):]
         # Only look at text until the next Dockerfile instruction
