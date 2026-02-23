@@ -26,8 +26,9 @@ COPY model/ ./model/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
 
-# Install the package (production mode — not editable)
-RUN pip install --no-cache-dir .
+# Install the package (production mode — not editable, no deps since
+# requirements-prod.txt already provides all runtime dependencies)
+RUN pip install --no-cache-dir --no-deps .
 
 # Create non-root user
 RUN useradd -m -u 1000 apiuser && \

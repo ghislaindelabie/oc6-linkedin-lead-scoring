@@ -32,8 +32,8 @@ class TestDockerfileStructure:
             "Dockerfile must COPY pyproject.toml (needed for pip install .)"
 
     def test_installs_package_in_production_mode(self, dockerfile_content):
-        assert "pip install --no-cache-dir ." in dockerfile_content, \
-            "Dockerfile must install the package with 'pip install --no-cache-dir .' (not editable)"
+        assert "pip install --no-cache-dir --no-deps ." in dockerfile_content, \
+            "Dockerfile must install the package with 'pip install --no-cache-dir --no-deps .' (not editable)"
         assert "pip install --no-cache-dir -e ." not in dockerfile_content, \
             "Dockerfile must NOT use editable mode (-e) in production"
 
