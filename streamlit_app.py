@@ -20,8 +20,15 @@ Run
     streamlit run streamlit_app.py
 """
 import os
+import sys
 import tempfile
 from pathlib import Path
+
+# When running on HF Spaces (Streamlit SDK), the package isn't pip-installed.
+# Add src/ to path so `linkedin_lead_scoring` is importable.
+_src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+if os.path.isdir(_src_dir) and _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 import httpx
 import numpy as np

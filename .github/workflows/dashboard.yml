@@ -76,10 +76,10 @@ jobs:
               allow_patterns=[
                   "README.md",
                   "streamlit_app.py",
+                  "src/linkedin_lead_scoring/__init__.py",
                   "src/linkedin_lead_scoring/monitoring/**",
                   "model/**",
                   "requirements.txt",
-                  "pyproject.toml",
               ],
           )
           print("Dashboard uploaded successfully")
