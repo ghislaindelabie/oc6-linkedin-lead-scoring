@@ -411,6 +411,30 @@ class TestProductionWorkflow:
         assert "HF_TOKEN" in env_keys, \
             "production.yml must use HF_TOKEN secret"
 
+    def test_production_has_smoke_tests_job(self):
+        data = load_yaml(PRODUCTION_YML)
+        assert "smoke-tests" in data["jobs"], \
+            "production.yml must have a 'smoke-tests' job"
+
+    def test_production_smoke_tests_needs_deploy_jobs(self):
+        data = load_yaml(PRODUCTION_YML)
+        needs = data["jobs"]["smoke-tests"].get("needs", [])
+        if isinstance(needs, str):
+            needs = [needs]
+        assert "deploy-production-api" in needs, \
+            "smoke-tests must depend on deploy-production-api"
+        assert "deploy-production-dashboard" in needs, \
+            "smoke-tests must depend on deploy-production-dashboard"
+
+    def test_production_smoke_checks_both_services(self):
+        data = load_yaml(PRODUCTION_YML)
+        smoke_steps = data["jobs"]["smoke-tests"].get("steps", [])
+        run_commands = " ".join(s.get("run", "") for s in smoke_steps)
+        assert "oc6-bizdev-ml-api.hf.space/health" in run_commands, \
+            "smoke-tests must check API health"
+        assert "oc6-bizdev-monitoring.hf.space" in run_commands, \
+            "smoke-tests must check dashboard health"
+
 
 # ---------------------------------------------------------------------------
 # dashboard.yml API_ENDPOINT tests
