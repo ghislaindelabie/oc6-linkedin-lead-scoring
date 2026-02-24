@@ -352,3 +352,121 @@ class TestRealPreprocessingPath:
         data = response.json()
         assert data["total_count"] == 3
         assert len(data["predictions"]) == 3
+
+
+# ---------------------------------------------------------------------------
+# Error path tests — uncovered branches in predict.py (T11)
+# ---------------------------------------------------------------------------
+
+
+class TestPredictErrorPaths:
+    def test_predict_internal_error_500_with_real_preprocessing(
+        self, client_with_preprocessor, monkeypatch
+    ):
+        """Model.predict_proba() raising in the non-mock path must return 500."""
+        import linkedin_lead_scoring.api.predict as predict_module
+
+        class CrashModel:
+            def predict_proba(self, X):
+                raise RuntimeError("deliberate crash in predict_proba")
+
+        monkeypatch.setitem(predict_module._state, "model", CrashModel())
+        monkeypatch.setitem(predict_module._state, "is_mock", False)
+
+        response = client_with_preprocessor.post("/predict", json=VALID_LEAD)
+        assert response.status_code == 500
+        data = response.json()
+        assert data["error"] == "internal_error"
+        assert "message" in data
+        # Stack trace must not leak
+        assert "deliberate crash" not in data.get("message", "")
+        assert "Traceback" not in str(data)
+
+    def test_batch_internal_error_500(self, client_with_preprocessor, monkeypatch):
+        """Batch endpoint: model.predict_proba() raising must return 500."""
+        import linkedin_lead_scoring.api.predict as predict_module
+
+        class CrashModel:
+            def predict_proba(self, X):
+                raise ValueError("batch crash")
+
+        monkeypatch.setitem(predict_module._state, "model", CrashModel())
+        monkeypatch.setitem(predict_module._state, "is_mock", False)
+
+        response = client_with_preprocessor.post(
+            "/predict/batch", json={"leads": [VALID_LEAD, {}]}
+        )
+        assert response.status_code == 500
+        data = response.json()
+        assert data["error"] == "internal_error"
+        assert "batch crash" not in data.get("message", "")
+
+    def test_predict_log_write_failure_non_blocking(
+        self, client_with_preprocessor, monkeypatch, tmp_path
+    ):
+        """Prediction log write failure must not prevent a successful 200 response."""
+        import linkedin_lead_scoring.api.predict as predict_module
+
+        # Point log to a path where the parent is a file (unwritable as directory)
+        unwritable_log = str(tmp_path / "not_a_dir" / "predictions.jsonl")
+        # Create a file where the directory would be, so makedirs fails
+        blocker = tmp_path / "not_a_dir"
+        blocker.write_text("I am a file, not a directory")
+        monkeypatch.setattr(predict_module, "_PREDICTIONS_LOG", unwritable_log)
+
+        response = client_with_preprocessor.post("/predict", json=VALID_LEAD)
+        # Prediction must still succeed
+        assert response.status_code == 200
+        assert 0.0 <= response.json()["score"] <= 1.0
+
+    def test_build_log_entry_has_expected_fields(self):
+        """Unit-test _build_log_entry directly for required output fields."""
+        from linkedin_lead_scoring.api.predict import _build_log_entry
+        from linkedin_lead_scoring.api.schemas import LeadInput, LeadPrediction
+
+        lead = LeadInput(llm_quality=80, jobtitle="CTO")
+        prediction = LeadPrediction(
+            score=0.72,
+            label="engaged",
+            confidence="high",
+            model_version="test-0.3.0",
+            inference_time_ms=12.5,
+        )
+        entry = _build_log_entry(lead, prediction)
+
+        assert "timestamp" in entry
+        assert "input" in entry
+        assert "score" in entry
+        assert "label" in entry
+        assert "inference_ms" in entry
+        assert "model_version" in entry
+        assert entry["score"] == 0.72
+        assert entry["label"] == "engaged"
+        assert entry["model_version"] == "test-0.3.0"
+        assert isinstance(entry["input"], dict)
+
+    def test_lifespan_load_failure_model_not_loaded(self, monkeypatch, tmp_path):
+        """When model file is a non-joblib file, lifespan catches the exception
+        and model_loaded remains False."""
+        import linkedin_lead_scoring.api.predict as predict_module
+        from fastapi.testclient import TestClient
+        from linkedin_lead_scoring.api.main import app
+
+        # Create a file that exists but cannot be joblib.load()-ed
+        bad_model_file = tmp_path / "bad_model.joblib"
+        bad_model_file.write_text("not a joblib file")
+
+        # Also need preprocessor and feature_cols to exist (mock with bad content)
+        bad_preprocessor = tmp_path / "preprocessor.joblib"
+        bad_preprocessor.write_text("not a preprocessor")
+        feature_cols_file = tmp_path / "feature_columns.json"
+        feature_cols_file.write_text('["col1", "col2"]')
+
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setattr(predict_module, "_MODEL_PATH", str(bad_model_file))
+        monkeypatch.setattr(predict_module, "_PREPROCESSOR_PATH", str(bad_preprocessor))
+        monkeypatch.setattr(predict_module, "_FEATURE_COLS_PATH", str(feature_cols_file))
+
+        with TestClient(app) as c:
+            health = c.get("/health").json()
+            assert health["model_loaded"] is False
