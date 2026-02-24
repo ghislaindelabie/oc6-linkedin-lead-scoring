@@ -211,9 +211,12 @@ Automatic deployment to HF Spaces on push to `main` branch (after tests pass).
   - Local dev falls back to SQLite automatically (no setup needed)
   - Alembic migrations in `alembic/` — run `alembic upgrade head` before first deploy
 
-- **Model Monitoring:** (Session C — in progress)
-  - Drift detection with Evidently AI
-  - Streamlit dashboard for monitoring
+- **Model Monitoring:**
+  - Evidently AI drift detection (data drift + prediction score drift)
+  - Streamlit monitoring dashboard (`streamlit_app.py`) with live metrics
+  - ONNX Runtime optimization: 26.5x inference speedup over joblib
+  - Performance profiling with cProfile and tracemalloc
+  - See `docs/MONITORING_GUIDE.md` and `docs/PERFORMANCE_REPORT.md`
 
 ## License
 

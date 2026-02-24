@@ -56,3 +56,8 @@ markers = [
 ]
 asyncio_mode = "auto"
 pythonpath = ["src"]
+filterwarnings = [
+    "ignore:numpy.core is deprecated:DeprecationWarning:evidently",
+    "ignore:invalid value encountered in divide:RuntimeWarning:numpy",
+    "ignore:divide by zero encountered in divide:RuntimeWarning:scipy",
+]
