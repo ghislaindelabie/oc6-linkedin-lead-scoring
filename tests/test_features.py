@@ -400,3 +400,147 @@ class TestPreprocessForInference:
         )
         assert result.shape[1] == len(sample_feature_columns)
         assert not result.isnull().any().any()
+
+
+# ---------------------------------------------------------------------------
+# TestOneHotEncodeDeterminism
+# ---------------------------------------------------------------------------
+
+_OHE_CAT_PREFIXES = ("llm_seniority_", "llm_geography_", "llm_business_type_",
+                     "companysize_", "companytype_")
+
+
+class TestOneHotEncodeDeterminism:
+    """Verify that one_hot_encode() is deterministic and batch-size independent
+    when feature_columns (inference path) is provided."""
+
+    def _ohe_cols(self, columns):
+        """Return OHE column names from a list of column names."""
+        return [c for c in columns if c.startswith(_OHE_CAT_PREFIXES)]
+
+    def test_single_vs_batch_consistency(self, sample_feature_columns):
+        """A single lead processed alone must produce the same OHE columns as
+        when the same lead is part of a larger batch."""
+        single_lead = {
+            "llm_seniority": "Senior", "llm_geography": "international_hub",
+            "llm_business_type": "leaders", "companysize": "51-200",
+            "companytype": "Privately Held", "llm_quality": 75,
+        }
+        batch_leads = [
+            single_lead.copy(),
+            {"llm_seniority": "Mid", "llm_geography": "other",
+             "llm_business_type": "others", "companysize": "11-50",
+             "companytype": "Public Company", "llm_quality": 30},
+            {"llm_seniority": "Entry", "llm_geography": "local",
+             "llm_business_type": "workers", "companysize": "2-10",
+             "companytype": "Sole Proprietorship", "llm_quality": 60},
+        ]
+
+        single_result = one_hot_encode(
+            pd.DataFrame([single_lead]), feature_columns=sample_feature_columns
+        )
+        batch_result = one_hot_encode(
+            pd.DataFrame(batch_leads), feature_columns=sample_feature_columns
+        )
+
+        ohe_cols = self._ohe_cols(single_result.columns)
+        assert len(ohe_cols) > 0, "No OHE columns found in single result"
+        for col in ohe_cols:
+            assert col in batch_result.columns, f"Column {col} missing from batch result"
+            assert single_result[col].iloc[0] == batch_result[col].iloc[0], \
+                f"Mismatch in {col}: single={single_result[col].iloc[0]}, batch={batch_result[col].iloc[0]}"
+
+    def test_inference_path_with_feature_columns(self, sample_feature_columns):
+        """When feature_columns is provided, output OHE columns must match
+        exactly the dummy columns listed in feature_columns."""
+        df = pd.DataFrame([{
+            "llm_seniority": "Senior", "llm_geography": "international_hub",
+            "llm_business_type": "leaders", "companysize": "51-200",
+            "companytype": "Privately Held",
+        }])
+
+        result = one_hot_encode(df.copy(), feature_columns=sample_feature_columns)
+
+        # Expected OHE cols come exclusively from feature_columns
+        expected_ohe_cols = set(
+            fc for fc in sample_feature_columns if fc.startswith(_OHE_CAT_PREFIXES)
+        )
+        actual_ohe_cols = set(self._ohe_cols(result.columns))
+        assert actual_ohe_cols == expected_ohe_cols, (
+            f"OHE columns mismatch:\n"
+            f"  expected: {sorted(expected_ohe_cols)}\n"
+            f"  actual:   {sorted(actual_ohe_cols)}"
+        )
+
+    def test_unseen_category_handled(self, sample_feature_columns):
+        """A category value not present in the training set (feature_columns)
+        should result in all dummy columns for that categorical being 0."""
+        df = pd.DataFrame([{
+            "llm_seniority": "Intern",  # unseen category
+            "llm_geography": "international_hub",
+            "llm_business_type": "leaders",
+            "companysize": "51-200",
+            "companytype": "Privately Held",
+        }])
+
+        result = one_hot_encode(df.copy(), feature_columns=sample_feature_columns)
+
+        # All llm_seniority_ dummies should be 0 since "Intern" is unknown
+        seniority_cols = [c for c in result.columns if c.startswith("llm_seniority_")]
+        assert len(seniority_cols) > 0, "No llm_seniority_ columns found"
+        for col in seniority_cols:
+            assert result[col].iloc[0] == 0, \
+                f"Expected 0 for unseen category in {col}, got {result[col].iloc[0]}"
+
+    def test_single_lead_ohe_no_dropped_columns(self, sample_feature_columns):
+        """Single-row inference with feature_columns must NOT drop any expected
+        OHE column. This guards against the drop_first bug for single-row batches."""
+        df = pd.DataFrame([{
+            "llm_seniority": "Senior", "llm_geography": "international_hub",
+            "llm_business_type": "leaders", "companysize": "51-200",
+            "companytype": "Privately Held",
+        }])
+
+        result = one_hot_encode(df.copy(), feature_columns=sample_feature_columns)
+
+        # All expected OHE columns must be present (not silently dropped)
+        expected_ohe_cols = [
+            fc for fc in sample_feature_columns if fc.startswith(_OHE_CAT_PREFIXES)
+        ]
+        for col in expected_ohe_cols:
+            assert col in result.columns, \
+                f"Expected OHE column {col} missing from single-row result"
+
+        # The "Senior" row must have llm_seniority_Senior = 1
+        assert "llm_seniority_Senior" in result.columns
+        assert result["llm_seniority_Senior"].iloc[0] == 1
+
+    def test_batch_deterministic_across_runs(self, sample_feature_columns):
+        """Running the same batch twice must produce identical DataFrames."""
+        batch_leads = [
+            {"llm_seniority": "Senior", "llm_geography": "international_hub",
+             "llm_business_type": "leaders", "companysize": "51-200",
+             "companytype": "Privately Held", "llm_quality": 75},
+            {"llm_seniority": "Mid", "llm_geography": "other",
+             "llm_business_type": "experts", "companysize": "201-500",
+             "companytype": "Public Company", "llm_quality": 55},
+            {"llm_seniority": "Entry", "llm_geography": "regional_hub",
+             "llm_business_type": "workers", "companysize": "2-10",
+             "companytype": "Sole Proprietorship", "llm_quality": 20},
+        ]
+
+        result1 = one_hot_encode(
+            pd.DataFrame(batch_leads), feature_columns=sample_feature_columns
+        )
+        result2 = one_hot_encode(
+            pd.DataFrame(batch_leads), feature_columns=sample_feature_columns
+        )
+
+        # Same columns in same order
+        assert list(result1.columns) == list(result2.columns)
+        # Same values for all OHE columns
+        ohe_cols = self._ohe_cols(result1.columns)
+        assert len(ohe_cols) > 0
+        for col in ohe_cols:
+            assert result1[col].tolist() == result2[col].tolist(), \
+                f"Non-deterministic output in column {col}"
