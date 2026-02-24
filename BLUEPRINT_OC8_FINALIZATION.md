@@ -2,9 +2,9 @@
 
 **Goal**: Bring the OC8 project to production-ready state with all deployment, monitoring, and validation deliverables complete.
 
-**Date**: 2026-02-24
-**Branch**: `v0.3.0` (current: `04ce686`)
-**Baseline**: 217 tests passing, 43.6% coverage
+**Date**: 2026-02-24 (updated)
+**Branch**: `v0.3.0` (current: `4819b27` — all CI fixes applied)
+**Baseline**: 299 tests passing, 55.39% coverage (93.4% production code)
 
 ---
 
@@ -16,56 +16,85 @@
 | Model artifacts | **DONE** | Re-exported with correct medians |
 | Staging CI/CD (`staging.yml`) | **DONE** | Auto-deploys on `v0.3.0` push |
 | Prediction logging (Supabase) | **PARTIAL** | Code done, prod `DATABASE_URL` not set |
-| Monitoring dashboard (Streamlit) | **PR #7 OPEN** | Has merge conflicts with v0.3.0 |
-| Drift detection (Evidently) | **PR #7 OPEN** | Ready, needs merge |
-| Security scanning (Nuclei) | **NOT STARTED** | Referenced in project scope |
-| Uptime monitoring | **NOT STARTED** | Referenced in project scope |
-| E2E tests (Playwright) | **NOT STARTED** | |
-| Production deployment | **PARTIAL** | API live, dashboard needs API_ENDPOINT config |
+| Monitoring dashboard (Streamlit) | **DONE** | PR #7 merged into v0.3.0 |
+| Drift detection (Evidently) | **DONE** | 299 tests, 55.39% coverage |
+| Security scanning (Nuclei) | **PR #9** | Nuclei scan in security.yml (full on staging, safe on prod) |
+| Uptime monitoring | **USER-MANAGED** | Uptime Kuma — user adds monitor manually |
+| E2E tests | **PR #9** | httpx-based E2E tests against staging API |
+| Production deployment | **PR #8** | production.yml + dashboard API_ENDPOINT config |
 | Local-vs-API validation | **DONE** | `scripts/validate_pipeline.py` — all scores match |
+| Test hardening | **PR #10** | OHE determinism, predict error paths, pipeline validation |
+| CI fixes | **DONE** | ruff cleanup, monitoring deps, onnx conditional import |
+
+---
+
+## Coverage Analysis
+
+**Post-merge status**: 298 tests, 55.35% coverage (1037 statements, 463 missed)
+
+### Why coverage is only 55%
+
+Two **dead-code modules** (not imported anywhere) account for 432 of the 463 missed lines:
+
+| Module | Lines | Covered | Why uncovered |
+|--------|-------|---------|---------------|
+| `data/llm_enrichment.py` | 237 | 0% | Training notebook utility, requires OpenAI API |
+| `data/utils_data.py` | 195 | 0% | Training notebook utility, MLflow data loading |
+| **All other modules** | **605** | **93.4%** | Production code — well tested |
+
+### Excluding dead code, production coverage is 93.4%
+
+The remaining gaps in production code:
+- `api/predict.py` (84.7%): error-handling branches (load failure, empty list guard) — **easy to test**
+- `db/connection.py` (73.3%): PostgreSQL URL rewrite + get_db yield — **needs mock**
+- `api/middleware.py` (94.9%): log write exception — **trivial to test**
+
+### Recommended target: **55%** overall (raises to **65%** after T10-T12)
+
+This corresponds to **95%+ of production code**. The 2 data modules (432 lines, 0%) are training-only notebook utilities — testing them requires OpenAI API mocking with no production benefit.
 
 ---
 
 ## Tasks
 
-### Track 1: Merge & Stabilize (Opus coordinator)
+### Track 1: Merge & Stabilize (Opus coordinator) — DONE
 
-| # | Task | Size | Deps | Files |
-|---|------|------|------|-------|
-| T1 | Merge PR #7 (monitoring) into v0.3.0 — resolve conflicts (README.md, pyproject.toml) | M | — | README.md, pyproject.toml, src/...monitoring/*, tests/test_monitoring* |
-| T2 | Run full test suite post-merge, fix any breakage | S | T1 | tests/* |
-| T3 | Raise coverage threshold from 10% to 40% in ci.yml + staging.yml | S | T2 | .github/workflows/ci.yml, .github/workflows/staging.yml |
+| # | Task | Size | Deps | Files | Status |
+|---|------|------|------|-------|--------|
+| T1 | Merge PR #7 (monitoring) into v0.3.0 | M | — | README.md, pyproject.toml, SESSION_COORDINATION.md | **DONE** |
+| T2 | Run full test suite post-merge | S | T1 | tests/* | **DONE** (299 pass) |
+| T3 | Raise coverage threshold from 10% to 50% in ci.yml + staging.yml | S | T10-T12 | .github/workflows/ci.yml, .github/workflows/staging.yml | After PR merges |
 
-### Track 2: Production Configuration (Sonnet subagent A — Infra)
+### Track 2: Production Configuration (Subagent A) — PR #8
 
-| # | Task | Size | Deps | Files |
-|---|------|------|------|-------|
-| T4 | Fix `dashboard.yml` — add `API_ENDPOINT` env var on Streamlit Space | S | T1 | .github/workflows/dashboard.yml |
-| T5 | Add production deployment workflow (`production.yml`) triggered on `main` push — deploy API + dashboard to prod Spaces | M | T1 | .github/workflows/production.yml (NEW) |
-| T6 | Add `DATABASE_URL` secret config to production deploy step (uses existing GitHub secret) | S | T5 | .github/workflows/production.yml |
+| # | Task | Size | Status |
+|---|------|------|--------|
+| T4 | Fix `dashboard.yml` — add `API_ENDPOINT` env var on Streamlit Space | S | **DONE** |
+| T5 | Add production deployment workflow (`production.yml`) | M | **DONE** |
+| T6 | Add `DATABASE_URL` secret config to production deploy step | S | **DONE** |
 
-### Track 3: Security & Availability (Sonnet subagent B — Security)
+### Track 3: Security & Availability (Subagent B) — PR #9
 
-| # | Task | Size | Deps | Files |
-|---|------|------|------|-------|
-| T7 | Add Nuclei security scan to `security.yml` (weekly scan of staging + prod API URLs) | M | — | .github/workflows/security.yml |
-| T8 | Add Uptime Kuma check endpoint + documentation for external monitoring setup | S | — | docs/UPTIME_MONITORING.md (NEW) |
-| T9 | Add Playwright E2E test: API health + predict round-trip against staging | M | T1 | tests/test_e2e.py (NEW), .github/workflows/staging.yml |
+| # | Task | Size | Status |
+|---|------|------|--------|
+| T7 | Add Nuclei security scan to `security.yml` (full on staging, safe on prod) | M | **DONE** |
+| T8 | ~~Uptime Kuma~~ — **USER-MANAGED** | — | N/A |
+| T9 | Add E2E tests: API health + predict round-trip against staging | M | **DONE** |
 
-### Track 4: Test Hardening (Sonnet subagent C — Tests)
+### Track 4: Test Hardening (Subagent C) — PR #10
 
-| # | Task | Size | Deps | Files |
-|---|------|------|------|-------|
-| T10 | Add integration tests for OHE determinism: single vs batch prediction consistency | S | T1 | tests/test_features.py |
-| T11 | Add tests for drift detection module (on v0.3.0 after merge) | S | T1 | tests/test_drift.py |
-| T12 | Add test for validate_pipeline.py (--local-only, mock API) | S | T1 | tests/test_validate_pipeline.py (NEW) |
+| # | Task | Size | Status |
+|---|------|------|--------|
+| T10 | OHE determinism tests: single vs batch prediction consistency | S | **DONE** |
+| T11 | Predict endpoint error path tests | S | **DONE** |
+| T12 | validate_pipeline.py tests (--local-only, mock API) | S | **DONE** |
 
 ### Track 5: Documentation & Cleanup
 
-| # | Task | Size | Deps | Files |
-|---|------|------|------|-------|
-| T13 | Update README.md: production URLs, architecture diagram, quickstart for OC8 | M | T5 | README.md |
-| T14 | Clean up planning docs: archive SESSION_*_TASKS.md, update SESSION_COORDINATION.md with final state | S | T13 | SESSION_COORDINATION.md, SESSION_*_TASKS.md |
+| # | Task | Size | Deps | Status |
+|---|------|------|------|--------|
+| T13 | Update README.md, SESSION_COORDINATION.md, BLUEPRINT | M | T5 | **DONE** |
+| T14 | Clean up planning docs: archive SESSION_*_TASKS.md | S | T13 | After final merge |
 
 ---
 
