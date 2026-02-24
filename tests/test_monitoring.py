@@ -68,6 +68,38 @@ class TestStreamlitAppImports:
     def test_dashboard_utils_importable(self):
         from linkedin_lead_scoring.monitoring import dashboard_utils  # noqa: F401
 
+    def test_monitoring_package_works_without_onnx(self):
+        """Monitoring package must remain importable when onnx is absent."""
+        import importlib
+        import sys
+
+        # Temporarily make 'onnx' unimportable
+        real_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else __import__
+
+        def mock_import(name, *args, **kwargs):
+            if name in ("onnx", "onnxruntime", "onnxmltools"):
+                raise ModuleNotFoundError(f"No module named '{name}'")
+            return real_import(name, *args, **kwargs)
+
+        # Remove cached monitoring modules so reimport triggers __init__.py
+        mods_to_remove = [k for k in sys.modules if k.startswith("linkedin_lead_scoring.monitoring")]
+        saved = {k: sys.modules.pop(k) for k in mods_to_remove}
+
+        try:
+            import builtins
+            original = builtins.__import__
+            builtins.__import__ = mock_import
+            monitoring = importlib.import_module("linkedin_lead_scoring.monitoring")
+            # dashboard_utils and profiler should still be accessible
+            assert monitoring.dashboard_utils is not None
+            assert monitoring.profiler is not None
+            # onnx_optimizer should be None (graceful degradation)
+            assert monitoring.onnx_optimizer is None
+        finally:
+            builtins.__import__ = original
+            # Restore original modules
+            sys.modules.update(saved)
+
 
 # ---------------------------------------------------------------------------
 # Test: log parsing
