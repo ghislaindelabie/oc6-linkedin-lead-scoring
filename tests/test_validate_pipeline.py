@@ -1,9 +1,7 @@
 """Tests for scripts/validate_pipeline.py"""
-import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import numpy as np
 import pytest
 
 # The validate_pipeline.py script does sys.path manipulation, so import carefully
