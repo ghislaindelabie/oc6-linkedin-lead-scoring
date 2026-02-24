@@ -16,10 +16,7 @@ api_requests (logs/api_requests.jsonl):
 import json
 import os
 from datetime import datetime, timedelta
-from typing import Any
-
 import numpy as np
-import pandas as pd
 
 
 # ---------------------------------------------------------------------------

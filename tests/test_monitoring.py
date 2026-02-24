@@ -9,11 +9,8 @@ Tests cover:
 import json
 import os
 import tempfile
-from typing import Any
 
-import numpy as np
-import pandas as pd
-import pytest
+
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +54,7 @@ def _make_api_request_entry(
 class TestStreamlitAppImports:
     def test_streamlit_app_is_importable(self):
         """streamlit_app.py must be importable without executing st.* calls."""
-        import importlib.util, sys
+        import importlib.util
 
         # We add the worktree root to sys.path so the top-level file is importable
         worktree_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -203,8 +200,8 @@ class TestComputeScoreStats:
         if labels is None:
             labels = ["engaged" if s > 0.5 else "not_engaged" for s in scores]
         return [
-            {"score": s, "label": l, "timestamp": "2026-02-20T12:00:00", "inference_ms": 10.0}
-            for s, l in zip(scores, labels)
+            {"score": s, "label": lbl, "timestamp": "2026-02-20T12:00:00", "inference_ms": 10.0}
+            for s, lbl in zip(scores, labels)
         ]
 
     def test_percentiles_computed(self):
@@ -337,7 +334,8 @@ class TestComputeUptimeStats:
 class TestLoadJsonlWithBlankLines:
     def test_blank_lines_skipped(self):
         """JSONL files with blank separator lines should parse correctly."""
-        import json, os, tempfile
+        import json
+        import tempfile
         from linkedin_lead_scoring.monitoring.dashboard_utils import load_prediction_logs
 
         entry = {"timestamp": "2026-02-20T12:00:00", "score": 0.7,

@@ -3,10 +3,7 @@
 Verifies that docs/PERFORMANCE_REPORT.md and docs/MONITORING_GUIDE.md
 exist and contain the required sections defined in SESSION_C_TASKS.md.
 """
-import os
 import pathlib
-
-import pytest
 
 WORKTREE_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOCS_DIR = WORKTREE_ROOT / "docs"
