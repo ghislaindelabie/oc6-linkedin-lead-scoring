@@ -40,7 +40,7 @@ jobs:
             --cov=src/linkedin_lead_scoring \
             --cov-report=term-missing \
             --cov-report=xml \
-            --cov-fail-under=10
+            --cov-fail-under=50
 
   deploy-staging-api:
     name: Deploy API to Staging HF Space
@@ -234,4 +234,4 @@ jobs:
         env:
           STAGING_URL: "https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space"
           DASHBOARD_URL: "https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space"
-        run: pytest tests/test_e2e.py -v --tb=short
+        run: pytest tests/e2e/ -v --tb=short
