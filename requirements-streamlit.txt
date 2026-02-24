@@ -7,3 +7,7 @@ pandas>=2.0
 numpy>=1.26
 scipy>=1.11
 plotly>=5.20
+# ONNX optimization (used by monitoring/onnx_optimizer.py)
+onnx>=1.15
+onnxruntime>=1.17
+onnxmltools>=1.12

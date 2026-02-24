@@ -15,6 +15,11 @@ import numpy as np
 import pytest
 import xgboost as xgb
 
+# Skip entire module if ONNX stack is not installed
+pytest.importorskip("onnx", reason="onnx not installed")
+pytest.importorskip("onnxruntime", reason="onnxruntime not installed")
+pytest.importorskip("onnxmltools", reason="onnxmltools not installed")
+
 
 # ---------------------------------------------------------------------------
 # Shared fixture: tiny XGBoost classifier (module-scoped for speed)
