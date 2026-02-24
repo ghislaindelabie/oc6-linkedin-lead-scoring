@@ -1,6 +1,6 @@
 # Data Drift in Machine Learning — Complete Guide
 
-**Context**: LinkedIn Lead Scoring project (Pret a Depenser) — XGBoost classifier predicting engagement probability from LinkedIn profile data.
+**Context**: LinkedIn Lead Scoring project (LeadGen scorer) — XGBoost classifier predicting engagement probability from LinkedIn profile data.
 
 ---
 

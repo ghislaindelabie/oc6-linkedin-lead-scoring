@@ -1,6 +1,6 @@
 # Monitoring Guide — LinkedIn Lead Scoring v0.3.0
 
-**Audience**: MLOps engineers and data scientists maintaining the "Pret a Depenser" lead scoring system.
+**Audience**: MLOps engineers and data scientists maintaining the LeadGen scorer system.
 
 ---
 
