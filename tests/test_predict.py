@@ -320,3 +320,35 @@ class TestMockModelFixture:
         data = response.json()
         assert data["score"] == pytest.approx(0.7, abs=0.01)
         assert data["model_version"] == "test-0.0.0"
+
+
+# ---------------------------------------------------------------------------
+# Real preprocessing path (is_mock=False) — exercises the full pipeline
+# ---------------------------------------------------------------------------
+
+
+class TestRealPreprocessingPath:
+    def test_predict_with_real_preprocessing(self, client_with_preprocessor):
+        response = client_with_preprocessor.post("/predict", json=VALID_LEAD)
+        assert response.status_code == 200
+        data = response.json()
+        assert 0.0 <= data["score"] <= 1.0
+        assert data["label"] in ("engaged", "not_engaged")
+        assert data["model_version"] == "test-real-0.0.0"
+
+    def test_predict_empty_lead_with_real_preprocessing(self, client_with_preprocessor):
+        response = client_with_preprocessor.post("/predict", json={})
+        assert response.status_code == 200
+
+    def test_predict_partial_lead_with_real_preprocessing(self, client_with_preprocessor):
+        partial = {"llm_quality": 80, "jobtitle": "CTO", "summary": "Tech leader"}
+        response = client_with_preprocessor.post("/predict", json=partial)
+        assert response.status_code == 200
+
+    def test_batch_with_real_preprocessing(self, client_with_preprocessor):
+        payload = {"leads": [VALID_LEAD, {}, {"jobtitle": "Manager"}]}
+        response = client_with_preprocessor.post("/predict/batch", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_count"] == 3
+        assert len(data["predictions"]) == 3

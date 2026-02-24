@@ -1,4 +1,8 @@
 """Shared pytest fixtures for API testing"""
+import json
+from pathlib import Path
+
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
@@ -71,3 +75,50 @@ def valid_lead():
         "skills": "Leadership, SaaS, B2B Sales, CRM",
         "jobtitle": "VP of Sales",
     }
+
+
+@pytest.fixture
+def client_with_preprocessor(monkeypatch):
+    """Test client with is_mock=False — exercises real preprocessing pipeline.
+
+    Uses real feature_columns.json and numeric_medians.json from model/,
+    but replaces the model with a FakeModel that accepts any DataFrame.
+    """
+    import linkedin_lead_scoring.api.predict as predict_module
+
+    class FakeModel:
+        """Accepts any input and returns a fixed score."""
+
+        def predict_proba(self, X):
+            n = len(X) if hasattr(X, "__len__") else 1
+            return np.array([[0.35, 0.65]] * n)
+
+    # Load real feature columns
+    feature_cols_path = Path("model/feature_columns.json")
+    with open(feature_cols_path) as f:
+        feature_cols = json.load(f)
+
+    # Load real numeric medians
+    medians_path = Path("model/numeric_medians.json")
+    numeric_medians = None
+    if medians_path.exists():
+        with open(medians_path) as f:
+            numeric_medians = json.load(f)
+
+    monkeypatch.setenv("APP_ENV", "production")
+    # Point to nonexistent files so lifespan doesn't try to joblib.load
+    monkeypatch.setattr(predict_module, "_MODEL_PATH", "/nonexistent/model.joblib")
+
+    with TestClient(app) as c:
+        # Inject state after lifespan (overrides the failed load)
+        monkeypatch.setitem(predict_module._state, "model", FakeModel())
+        monkeypatch.setitem(predict_module._state, "preprocessor", {
+            "target_encoder": None,
+            "te_cols": [],
+        })
+        monkeypatch.setitem(predict_module._state, "feature_cols", feature_cols)
+        monkeypatch.setitem(predict_module._state, "numeric_medians", numeric_medians)
+        monkeypatch.setitem(predict_module._state, "model_loaded", True)
+        monkeypatch.setitem(predict_module._state, "is_mock", False)
+        monkeypatch.setitem(predict_module._state, "model_version", "test-real-0.0.0")
+        yield c

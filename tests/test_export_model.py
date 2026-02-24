@@ -63,18 +63,18 @@ def sample_raw_df():
 
 class TestTextFeatureExtraction:
     def test_extract_text_features_has_summary(self, sample_raw_df):
-        from export_model import extract_text_features
+        from linkedin_lead_scoring.features import extract_text_features
         result = extract_text_features(sample_raw_df.copy())
         assert "has_summary" in result.columns
         assert result["has_summary"].sum() == sample_raw_df["summary"].notna().sum()
 
     def test_extract_text_features_has_skills(self, sample_raw_df):
-        from export_model import extract_text_features
+        from linkedin_lead_scoring.features import extract_text_features
         result = extract_text_features(sample_raw_df.copy())
         assert "has_skills" in result.columns
 
     def test_extract_text_features_jobtitle_flags(self, sample_raw_df):
-        from export_model import extract_text_features
+        from linkedin_lead_scoring.features import extract_text_features
         result = extract_text_features(sample_raw_df.copy())
         assert "is_founder" in result.columns
         assert "is_director" in result.columns
@@ -85,14 +85,14 @@ class TestTextFeatureExtraction:
         assert result.loc[3, "is_director"] == 1
 
     def test_extract_text_features_drops_raw_text_cols(self, sample_raw_df):
-        from export_model import extract_text_features
+        from linkedin_lead_scoring.features import extract_text_features
         result = extract_text_features(sample_raw_df.copy())
         assert "summary" not in result.columns
         assert "skills" not in result.columns
         assert "jobtitle" not in result.columns
 
     def test_extract_text_features_skills_count(self, sample_raw_df):
-        from export_model import extract_text_features
+        from linkedin_lead_scoring.features import extract_text_features
         result = extract_text_features(sample_raw_df.copy())
         assert "skills_count" in result.columns
         # "Python, ML, Leadership" → 3 skills
@@ -190,6 +190,19 @@ class TestArtifactSaving:
             feature_cols = json.load(f)
         ref_df = pd.read_csv(ref_dir / "training_reference.csv")
         assert feature_cols == list(ref_df.columns)
+
+    def test_save_numeric_medians_json(self, tmp_path, sample_raw_df):
+        """save_artifacts must produce numeric_medians.json with NUMERIC_COLS."""
+        _, _, model_dir, _ = self._call_save(tmp_path, sample_raw_df)
+        medians_path = model_dir / "numeric_medians.json"
+        assert medians_path.exists()
+        with open(medians_path) as f:
+            medians = json.load(f)
+        assert isinstance(medians, dict)
+        from linkedin_lead_scoring.features import NUMERIC_COLS
+        for col in NUMERIC_COLS:
+            assert col in medians, f"Missing median for {col}"
+            assert isinstance(medians[col], float)
 
 
 # ---------------------------------------------------------------------------

@@ -31,6 +31,7 @@ _PREDICTIONS_LOG = "logs/predictions.jsonl"
 _MODEL_PATH = "model/xgboost_model.joblib"
 _PREPROCESSOR_PATH = "model/preprocessor.joblib"
 _FEATURE_COLS_PATH = "model/feature_columns.json"
+_MEDIANS_PATH = "model/numeric_medians.json"
 _MODEL_VERSION = "0.3.0"
 
 # ---------------------------------------------------------------------------
@@ -41,6 +42,7 @@ _state: dict[str, Any] = {
     "model": None,
     "preprocessor": None,
     "feature_cols": None,
+    "numeric_medians": None,
     "model_version": "unknown",
     "model_loaded": False,
     "is_mock": False,
@@ -85,6 +87,9 @@ async def lifespan(app: FastAPI):
             _state["preprocessor"] = joblib.load(_PREPROCESSOR_PATH)
             with open(_FEATURE_COLS_PATH) as f:
                 _state["feature_cols"] = json.load(f)
+            if os.path.exists(_MEDIANS_PATH):
+                with open(_MEDIANS_PATH) as f:
+                    _state["numeric_medians"] = json.load(f)
             _state["model_version"] = _MODEL_VERSION
             _state["model_loaded"] = True
             _state["is_mock"] = False
@@ -106,6 +111,7 @@ async def lifespan(app: FastAPI):
     _state["model"] = None
     _state["preprocessor"] = None
     _state["feature_cols"] = None
+    _state["numeric_medians"] = None
     _state["model_loaded"] = False
     _state["is_mock"] = False
 
@@ -129,16 +135,24 @@ def _lead_to_dataframe(lead: LeadInput) -> pd.DataFrame:
     return pd.DataFrame([lead.model_dump()])
 
 
-def _align_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Align DataFrame columns to the model's expected feature columns.
+def _preprocess_input(df: pd.DataFrame) -> pd.DataFrame:
+    """Run the full feature engineering pipeline on raw lead data.
 
-    Adds missing columns as NaN and reorders to match training order.
+    Uses the shared ``features`` module so the preprocessing contract
+    is identical between training and inference.
     """
-    feature_cols: list[str] = _state["feature_cols"]
-    for col in feature_cols:
-        if col not in df.columns:
-            df[col] = np.nan
-    return df[feature_cols]
+    from linkedin_lead_scoring.features import preprocess_for_inference
+
+    preprocessor = _state["preprocessor"]
+    te = preprocessor.get("target_encoder") if preprocessor else None
+    te_cols = preprocessor.get("te_cols", []) if preprocessor else []
+    return preprocess_for_inference(
+        df,
+        target_encoder=te,
+        te_cols=te_cols,
+        feature_columns=_state["feature_cols"],
+        numeric_medians=_state.get("numeric_medians"),
+    )
 
 
 def is_model_loaded() -> bool:
@@ -205,8 +219,8 @@ async def predict(lead: LeadInput) -> LeadPrediction:
             proba = _state["model"].predict_proba(None)
             score = float(proba[0, 1])
         else:
-            df = _align_features(_lead_to_dataframe(lead))
-            X = _state["preprocessor"].transform(df)
+            df = _lead_to_dataframe(lead)
+            X = _preprocess_input(df)
             proba = _state["model"].predict_proba(X)
             score = float(proba[0, 1])
 
@@ -259,8 +273,8 @@ async def predict_batch(request: BatchPredictionRequest) -> BatchPredictionRespo
             probas = _state["model"].predict_proba(leads)
             scores = probas[:, 1].tolist()
         else:
-            df = _align_features(pd.DataFrame([lead.model_dump() for lead in leads]))
-            X = _state["preprocessor"].transform(df)
+            df = pd.DataFrame([lead.model_dump() for lead in leads])
+            X = _preprocess_input(df)
             probas = _state["model"].predict_proba(X)
             scores = probas[:, 1].tolist()
 

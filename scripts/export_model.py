@@ -12,6 +12,7 @@ Artifacts produced:
     model/xgboost_model.joblib     — trained XGBoost classifier
     model/preprocessor.joblib      — fitted preprocessing pipeline
     model/feature_columns.json     — ordered list of feature column names
+    model/numeric_medians.json     — training medians for numeric imputation
     data/reference/training_reference.csv — first 100 rows of training data
 """
 import argparse
@@ -29,6 +30,14 @@ from category_encoders import TargetEncoder
 from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
+
+from linkedin_lead_scoring.features import (
+    LOW_CARDINALITY_CATS,
+    NUMERIC_COLS,
+    TARGET_ENCODE_CATS,
+    TEXT_COLS,
+    extract_text_features,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -52,35 +61,6 @@ DATA_RELATIVE_PATHS = [
     Path("data/processed/linkedin_leads_clean.csv"),
     Path("../../data/processed/linkedin_leads_clean.csv"),
 ]
-
-# Categorical columns with low cardinality (will be one-hot encoded)
-LOW_CARDINALITY_CATS = [
-    "llm_seniority",
-    "llm_geography",
-    "llm_business_type",
-    "companysize",
-    "companytype",
-]
-
-# Categorical columns with medium/high cardinality (will be target encoded)
-TARGET_ENCODE_CATS = [
-    "llm_industry",
-    "industry",
-    "companyindustry",
-    "languages",
-    "location",
-    "companylocation",
-]
-
-NUMERIC_COLS = [
-    "llm_quality",
-    "llm_engagement",
-    "llm_decision_maker",
-    "llm_company_fit",
-    "companyfoundedon",
-]
-
-TEXT_COLS = ["summary", "skills", "jobtitle"]
 
 
 # ---------------------------------------------------------------------------
@@ -121,59 +101,6 @@ def find_data_file(
         + "\n".join(f"  {p}" for p in searched)
         + "\nPass --data-path explicitly."
     )
-
-
-# ---------------------------------------------------------------------------
-# Feature engineering
-# ---------------------------------------------------------------------------
-
-def extract_text_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Replace raw text columns with engineered numeric features.
-
-    Extracts completeness flags, length features, skills count, and job
-    title role indicators. Drops the original text columns.
-
-    Args:
-        df: DataFrame containing summary, skills, and jobtitle columns.
-
-    Returns:
-        DataFrame with text columns replaced by numeric features.
-    """
-    # Completeness flags
-    df["has_summary"] = df["summary"].notna().astype(int)
-    df["has_skills"] = df["skills"].notna().astype(int)
-    df["has_jobtitle"] = df["jobtitle"].notna().astype(int)
-
-    # Length features
-    df["summary_length"] = df["summary"].str.len().fillna(0).astype(int)
-    df["skills_count"] = (
-        df["skills"].str.split(",").apply(lambda x: len(x) if isinstance(x, list) else 0)
-    )
-    df["jobtitle_length"] = df["jobtitle"].str.len().fillna(0).astype(int)
-
-    # Job title role flags
-    jobtitle = df["jobtitle"].fillna("")
-    df["is_founder"] = jobtitle.str.contains(
-        r"Founder|CEO|CTO|Co-founder|Co-Founder", case=False, regex=True
-    ).astype(int)
-    df["is_director"] = jobtitle.str.contains(
-        r"Director|VP|Vice President", case=False, regex=True
-    ).astype(int)
-    df["is_manager"] = jobtitle.str.contains(
-        r"Manager|Lead|Head of", case=False, regex=True
-    ).astype(int)
-    df["is_sales"] = jobtitle.str.contains(
-        r"Sales|Business Development", case=False, regex=True
-    ).astype(int)
-    df["is_marketing"] = jobtitle.str.contains(
-        r"Marketing|Growth|CMO", case=False, regex=True
-    ).astype(int)
-    df["is_tech_role"] = jobtitle.str.contains(
-        r"Engineer|Developer|Architect|CTO", case=False, regex=True
-    ).astype(int)
-
-    df = df.drop(columns=TEXT_COLS)
-    return df
 
 
 # ---------------------------------------------------------------------------
@@ -282,6 +209,15 @@ def save_artifacts(
     with open(model_dir / "feature_columns.json", "w") as f:
         json.dump(feature_columns, f, indent=2)
 
+    # Save numeric medians for inference-time imputation
+    medians = {
+        col: float(X_train[col].median())
+        for col in NUMERIC_COLS
+        if col in X_train.columns
+    }
+    with open(model_dir / "numeric_medians.json", "w") as f:
+        json.dump(medians, f, indent=2)
+
     # Save reference data (first 100 rows of training set for drift detection)
     reference_df = X_train.head(100)
     reference_df.to_csv(reference_dir / "training_reference.csv", index=False)
@@ -289,6 +225,7 @@ def save_artifacts(
     print(f"  Saved model:         {model_dir / 'xgboost_model.joblib'}")
     print(f"  Saved preprocessor:  {model_dir / 'preprocessor.joblib'}")
     print(f"  Saved feature cols:  {model_dir / 'feature_columns.json'} ({len(feature_columns)} features)")
+    print(f"  Saved medians:       {model_dir / 'numeric_medians.json'}")
     print(f"  Saved reference:     {reference_dir / 'training_reference.csv'} ({len(reference_df)} rows)")
 
 
