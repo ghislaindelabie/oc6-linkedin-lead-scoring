@@ -1,17 +1,27 @@
-"""Shared pytest fixtures for API testing"""
+"""Shared pytest fixtures for API testing.
+
+Imports are conditional so the E2E test suite (which only installs
+pytest + httpx) can run without numpy, fastapi, or the application code.
+"""
 import json
 from pathlib import Path
 
-import numpy as np
 import pytest
-from fastapi.testclient import TestClient
 
-from linkedin_lead_scoring.api.main import app
+try:
+    import numpy as np
+    from fastapi.testclient import TestClient
+    from linkedin_lead_scoring.api.main import app
+    _HAS_APP_DEPS = True
+except ImportError:
+    _HAS_APP_DEPS = False
 
 
 @pytest.fixture
 def client(monkeypatch):
     """Test client with lifespan — no model files, no dev mode → model_loaded=False."""
+    if not _HAS_APP_DEPS:
+        pytest.skip("Full app dependencies not installed")
     import linkedin_lead_scoring.api.predict as predict_module
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setattr(predict_module, "_MODEL_PATH", "/nonexistent/model.joblib")
@@ -22,6 +32,8 @@ def client(monkeypatch):
 @pytest.fixture
 def dev_client(monkeypatch):
     """Test client with mock model loaded (APP_ENV=development, no real model files needed)."""
+    if not _HAS_APP_DEPS:
+        pytest.skip("Full app dependencies not installed")
     monkeypatch.setenv("APP_ENV", "development")
     with TestClient(app) as c:
         yield c
@@ -34,7 +46,8 @@ def mock_model(monkeypatch):
     Use this when you need fine-grained control over predicted scores.
     For most endpoint tests, prefer dev_client which activates the built-in mock mode.
     """
-    import numpy as np
+    if not _HAS_APP_DEPS:
+        pytest.skip("Full app dependencies not installed")
     import linkedin_lead_scoring.api.predict as predict_module
 
     class FakeModel:
@@ -84,6 +97,8 @@ def client_with_preprocessor(monkeypatch):
     Uses real feature_columns.json and numeric_medians.json from model/,
     but replaces the model with a FakeModel that accepts any DataFrame.
     """
+    if not _HAS_APP_DEPS:
+        pytest.skip("Full app dependencies not installed")
     import linkedin_lead_scoring.api.predict as predict_module
 
     class FakeModel:
