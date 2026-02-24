@@ -159,6 +159,9 @@ jobs:
           # Create Space (use static, metadata in README sets streamlit)
           api.create_repo(repo_id, repo_type="space", space_sdk="static", exist_ok=True)
 
+          # Configure environment
+          api.add_space_variable(repo_id, "API_ENDPOINT", "https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space")
+
           # Copy Space README to working dir for upload
           shutil.copy("/tmp/hf_space_readme.md", "README.md")
 
