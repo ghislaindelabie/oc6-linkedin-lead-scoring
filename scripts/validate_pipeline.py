@@ -27,6 +27,7 @@ import requests
 # Ensure the package is importable when running from project root
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from linkedin_lead_scoring.api.schemas import LeadInput
 from linkedin_lead_scoring.features import preprocess_for_inference
 
 # ---------------------------------------------------------------------------
@@ -159,8 +160,13 @@ def load_artifacts(model_dir: Path) -> dict:
 
 
 def predict_local(artifacts: dict, lead_data: dict) -> float:
-    """Run a local prediction and return the engagement probability."""
-    df = pd.DataFrame([lead_data])
+    """Run a local prediction and return the engagement probability.
+
+    Uses LeadInput to normalize the dict (fills missing fields with None),
+    matching the API's behavior where Pydantic ensures all 19 columns exist.
+    """
+    normalized = LeadInput(**lead_data).model_dump()
+    df = pd.DataFrame([normalized])
 
     te = artifacts["preprocessor"].get("target_encoder")
     te_cols = artifacts["preprocessor"].get("te_cols", [])

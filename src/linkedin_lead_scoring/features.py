@@ -139,8 +139,17 @@ def fill_missing_values(
 # One-hot encoding
 # ---------------------------------------------------------------------------
 
-def one_hot_encode(df: pd.DataFrame) -> pd.DataFrame:
-    """One-hot encode low-cardinality categorical columns (``drop_first=True``).
+def one_hot_encode(
+    df: pd.DataFrame,
+    feature_columns: list[str] | None = None,
+) -> pd.DataFrame:
+    """One-hot encode low-cardinality categorical columns.
+
+    When *feature_columns* is provided (inference), encodes against the
+    known training categories so the output is independent of which
+    categories appear in the current batch.  Falls back to
+    ``pd.get_dummies(drop_first=True)`` during training when the full
+    column list is not yet known.
 
     Boolean dummy columns are cast to int for XGBoost compatibility.
     """
@@ -148,12 +157,22 @@ def one_hot_encode(df: pd.DataFrame) -> pd.DataFrame:
     if not ohe_cols:
         return df
 
-    df = pd.get_dummies(df, columns=ohe_cols, drop_first=True)
-
-    # Cast boolean dummies to int
-    bool_cols = df.select_dtypes(include="bool").columns
-    if len(bool_cols):
-        df[bool_cols] = df[bool_cols].astype(int)
+    if feature_columns is not None:
+        # Inference path: manually create dummies from the known feature set
+        for col in ohe_cols:
+            # Identify expected dummy columns for this categorical
+            prefix = f"{col}_"
+            expected_dummies = [fc for fc in feature_columns if fc.startswith(prefix)]
+            for dummy_col in expected_dummies:
+                category = dummy_col[len(prefix):]
+                df[dummy_col] = (df[col] == category).astype(int)
+            df = df.drop(columns=[col])
+    else:
+        # Training path: discover categories from data
+        df = pd.get_dummies(df, columns=ohe_cols, drop_first=True)
+        bool_cols = df.select_dtypes(include="bool").columns
+        if len(bool_cols):
+            df[bool_cols] = df[bool_cols].astype(int)
 
     return df
 
@@ -216,7 +235,7 @@ def preprocess_for_inference(
             df[present_te_cols] = target_encoder.transform(df[present_te_cols])
 
     # 4. One-hot encode low-cardinality categoricals
-    df = one_hot_encode(df)
+    df = one_hot_encode(df, feature_columns=feature_columns)
 
     # 5. Drop any remaining non-numeric columns (e.g. un-encoded categoricals
     #    when target_encoder is None).  align_columns will fill them with 0.
