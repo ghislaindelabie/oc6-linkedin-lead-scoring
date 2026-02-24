@@ -4,7 +4,6 @@ import pandas as pd
 import pytest
 
 from linkedin_lead_scoring.features import (
-    NUMERIC_COLS,
     TEXT_COLS,
     align_columns,
     extract_text_features,
