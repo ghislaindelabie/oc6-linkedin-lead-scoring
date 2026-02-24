@@ -46,5 +46,5 @@ ENV PYTHONUNBUFFERED=1 \
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')" || exit 1
 
-# Run DB migrations then start the API server
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn linkedin_lead_scoring.api.main:app --host 0.0.0.0 --port 7860"]
+# Run DB migrations (non-fatal — API can operate without DB) then start the server
+CMD ["sh", "-c", "alembic upgrade head || echo 'WARNING: alembic migration failed, starting without DB'; exec uvicorn linkedin_lead_scoring.api.main:app --host 0.0.0.0 --port 7860"]
