@@ -1,0 +1,91 @@
+name: Deploy Monitoring Dashboard
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-dashboard:
+    name: Deploy Streamlit Dashboard to HF Spaces
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install huggingface_hub
+        run: python -m pip install --upgrade "huggingface_hub>=0.23.2"
+
+      - name: Prepare dashboard requirements
+        run: |
+          if [ -f requirements-streamlit.txt ]; then
+            cp requirements-streamlit.txt requirements.txt
+          else
+            cp requirements-prod.txt requirements.txt
+          fi
+
+      - name: Prepare Space README with Streamlit SDK metadata
+        run: |
+          cat > /tmp/hf_space_readme.md <<'READMEEOF'
+          ---
+          title: OC6 BizDev Monitoring
+          emoji: 📊
+          colorFrom: blue
+          colorTo: purple
+          sdk: streamlit
+          sdk_version: "1.30.0"
+          app_file: streamlit_app.py
+          pinned: false
+          ---
+          READMEEOF
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' /tmp/hf_space_readme.md
+
+      - name: Create Space and upload dashboard
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<'PYEOF'
+          import os
+          import shutil
+          from huggingface_hub import HfApi
+
+          token = os.environ["HF_TOKEN"]
+          api = HfApi(token=token)
+          repo_id = "ghislaindelabie/oc6-bizdev-monitoring"
+
+          # Create Space (use static, metadata in README sets streamlit)
+          api.create_repo(repo_id, repo_type="space", space_sdk="static", exist_ok=True)
+
+          # Configure environment
+          api.add_space_variable(repo_id, "API_ENDPOINT", "https://ghislaindelabie-oc6-bizdev-ml-api.hf.space")
+
+          # Copy Space README to working dir for upload
+          shutil.copy("/tmp/hf_space_readme.md", "README.md")
+
+          # Upload dashboard files
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              allow_patterns=[
+                  "README.md",
+                  "streamlit_app.py",
+                  "src/linkedin_lead_scoring/__init__.py",
+                  "src/linkedin_lead_scoring/monitoring/**",
+                  "model/**",
+                  "requirements.txt",
+              ],
+          )
+          print("Dashboard uploaded successfully")
+          PYEOF
+
+      - name: Display deployment info
+        run: |
+          echo "Monitoring dashboard deployed"
+          echo "Dashboard: https://ghislaindelabie-oc6-bizdev-monitoring.hf.space"

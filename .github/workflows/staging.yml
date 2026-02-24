@@ -1,0 +1,237 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-asyncio ruff aiosqlite pyyaml
+          pip install -r requirements-prod.txt
+          pip install -r requirements-streamlit.txt
+
+      - name: Install project (editable)
+        run: python -m pip install -e .
+
+      - name: Lint with ruff
+        run: ruff check src/ tests/
+
+      - name: Run tests with coverage
+        env:
+          APP_ENV: test
+        run: |
+          pytest -q \
+            --cov=src/linkedin_lead_scoring \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=50
+
+  deploy-staging-api:
+    name: Deploy API to Staging HF Space
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install huggingface_hub
+        run: python -m pip install --upgrade "huggingface_hub>=0.23.2"
+
+      - name: Create Space, configure env, and upload API
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          python - <<'PYEOF'
+          import os
+          from huggingface_hub import HfApi
+
+          token = os.environ["HF_TOKEN"]
+          api = HfApi(token=token)
+          repo_id = "ghislaindelabie/oc6-bizdev-ml-api-staging"
+
+          # Create Space (idempotent)
+          api.create_repo(repo_id, repo_type="space", space_sdk="docker", exist_ok=True)
+
+          # Configure environment
+          api.add_space_variable(repo_id, "APP_ENV", "staging")
+          api.add_space_variable(repo_id, "CORS_ORIGINS",
+              "https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space")
+          api.add_space_secret(repo_id, "DATABASE_URL",
+              os.environ["STAGING_DATABASE_URL"])
+
+          # Upload code
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              ignore_patterns=[
+                  ".git/*", ".venv/*", "tests/*", "htmlcov/*",
+                  ".pytest_cache/*", "*.pyc", "__pycache__/*",
+                  "notebooks/*", "mlruns/*", "data/*.csv", "data/*.json",
+                  "alembic/__pycache__/*",
+              ],
+          )
+          print("Staging API uploaded successfully")
+          PYEOF
+
+      - name: Display deployment info
+        run: |
+          echo "Staging API deployed"
+          echo "API: https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space"
+          echo "Docs: https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space/docs"
+
+  deploy-staging-dashboard:
+    name: Deploy Dashboard to Staging HF Space
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install huggingface_hub
+        run: python -m pip install --upgrade "huggingface_hub>=0.23.2"
+
+      - name: Prepare dashboard requirements
+        run: |
+          if [ -f requirements-streamlit.txt ]; then
+            cp requirements-streamlit.txt requirements.txt
+          else
+            cp requirements-prod.txt requirements.txt
+          fi
+
+      - name: Prepare Space README with Streamlit SDK metadata
+        run: |
+          cat > /tmp/hf_space_readme.md <<'READMEEOF'
+          ---
+          title: OC6 BizDev Monitoring (Staging)
+          emoji: 📊
+          colorFrom: blue
+          colorTo: purple
+          sdk: streamlit
+          sdk_version: "1.30.0"
+          app_file: streamlit_app.py
+          pinned: false
+          ---
+          READMEEOF
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' /tmp/hf_space_readme.md
+
+      - name: Create Space and upload dashboard
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<'PYEOF'
+          import os
+          import shutil
+          from huggingface_hub import HfApi
+
+          token = os.environ["HF_TOKEN"]
+          api = HfApi(token=token)
+          repo_id = "ghislaindelabie/oc6-bizdev-monitoring-staging"
+
+          # Create Space (use static, metadata in README sets streamlit)
+          api.create_repo(repo_id, repo_type="space", space_sdk="static", exist_ok=True)
+
+          # Configure environment
+          api.add_space_variable(repo_id, "API_ENDPOINT", "https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space")
+
+          # Copy Space README to working dir for upload
+          shutil.copy("/tmp/hf_space_readme.md", "README.md")
+
+          # Upload dashboard files
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              allow_patterns=[
+                  "README.md",
+                  "streamlit_app.py",
+                  "src/linkedin_lead_scoring/__init__.py",
+                  "src/linkedin_lead_scoring/monitoring/**",
+                  "model/**",
+                  "requirements.txt",
+              ],
+          )
+          print("Staging dashboard uploaded successfully")
+          PYEOF
+
+      - name: Display deployment info
+        run: |
+          echo "Staging dashboard deployed"
+          echo "Dashboard: https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space"
+
+  e2e-tests:
+    name: E2E Tests (Staging)
+    needs: [deploy-staging-api, deploy-staging-dashboard]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest httpx
+
+      - name: Wait for staging to be ready
+        run: |
+          echo "Waiting 60s for staging Spaces to rebuild..."
+          sleep 60
+
+          echo "--- Checking API ---"
+          for i in $(seq 1 10); do
+            if curl -sf "https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space/health" > /dev/null 2>&1; then
+              echo "Staging API is ready!"
+              break
+            fi
+            echo "API attempt $i/10 — waiting 30s..."
+            sleep 30
+          done
+
+          echo "--- Checking Dashboard ---"
+          for i in $(seq 1 10); do
+            if curl -sf "https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space/_stcore/health" > /dev/null 2>&1; then
+              echo "Staging Dashboard is ready!"
+              break
+            fi
+            echo "Dashboard attempt $i/10 — waiting 30s..."
+            sleep 30
+          done
+
+      - name: Run E2E tests
+        env:
+          STAGING_URL: "https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space"
+          DASHBOARD_URL: "https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space"
+        run: pytest tests/e2e/ -v --tb=short

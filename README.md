@@ -16,28 +16,60 @@ ML pipeline for predicting LinkedIn contact engagement (reply/interest) with com
 This project implements a complete MLOps pipeline for predicting LinkedIn lead engagement:
 - **MLflow experiment tracking** from data preparation through model training
 - **Jupyter notebooks** for data exploration and model development
-- **FastAPI REST API** for lead scoring (skeleton deployed)
+- **FastAPI REST API** with `/predict` and `/predict/batch` endpoints (live on staging)
+- **Streamlit monitoring dashboard** with drift detection and performance metrics
 - **Hybrid conda + uv** environment for package management
-- **CI/CD pipeline** with GitHub Actions
-- **Deployment** to Hugging Face Spaces
+- **CI/CD pipeline** with GitHub Actions (lint, test, Docker, deploy)
+- **Deployment** to Hugging Face Spaces (staging + production)
 
-## Current Status (v0.2.0-dev)
+## Current Status (v0.3.0)
 
-✅ **Completed**:
-- Data preparation notebook with MLflow tracking
-- Model training notebook (baseline + tree models + Optuna tuning)
-- Hybrid environment setup (conda for scientific packages, uv for ML packages)
-- FastAPI skeleton (v0.1.0 deployed to HF Spaces)
+**299 tests passing | 55% overall coverage | 93% production code coverage**
 
-🚧 **In Progress**:
-- Model validation and performance testing
-- Feature engineering enhancements
-- Production model deployment
+### Architecture
 
-📋 **Planned**:
-- LemList API integration for data collection
-- Automated retraining pipeline
-- Model monitoring and drift detection
+```
+                     GitHub Actions CI/CD
+                            |
+              push to v0.3.0 (staging) / main (production)
+                            |
+                +-----------+-----------+
+                |                       |
+        HF Space (Docker)       HF Space (Streamlit)
+        FastAPI Scoring API     Monitoring Dashboard
+          port 7860               port 8501
+                |                       |
+        Supabase PostgreSQL      Evidently AI
+        (prediction logging)     (drift detection)
+```
+
+### What's done
+
+- **Data pipeline**: Preparation + LLM enrichment notebooks with full MLflow tracking
+- **Model**: XGBoost classifier (Optuna-tuned, F1=0.556) — 1,909 contacts, 47 features
+- **Export**: `scripts/export_model.py` produces joblib model, preprocessor, feature columns, numeric medians
+- **API**: FastAPI with `/predict` (single lead), `/predict/batch` (up to 10,000), `/health`
+- **Preprocessing**: Target encoding, one-hot encoding (deterministic), text feature extraction, median imputation
+- **Database**: Async SQLAlchemy + Supabase PostgreSQL (prediction + API metric logging)
+- **Monitoring**: Evidently AI drift detection, Streamlit dashboard, ONNX optimization (26.5x speedup)
+- **CI/CD**: 5 GitHub Actions workflows (ci, staging, dashboard, security, production)
+- **Tests**: 15 test files, 299 tests — covers API, features, schemas, drift, monitoring, ONNX, profiler, docs, pipelines
+- **Validation**: `scripts/validate_pipeline.py` — confirms local model predictions match staging API
+
+### Open PRs (v0.3.0)
+
+| PR | Feature | Tests added | Status |
+|----|---------|-------------|--------|
+| #8 | Production deployment workflow + dashboard API_ENDPOINT | 14 | CI passing |
+| #9 | Nuclei security scan + E2E staging tests | 15 | CI passing |
+| #10 | OHE determinism, predict error paths, pipeline validation tests | 37 | CI passing |
+
+### Remaining
+
+- Merge PRs #8, #9, #10 into v0.3.0
+- Raise CI coverage threshold from 10% to 50%
+- Final PR from v0.3.0 to main (production go-live)
+- Set production `DATABASE_URL` GitHub secret
 
 ## Quickstart
 
@@ -97,12 +129,26 @@ pytest --cov=src/linkedin_lead_scoring --cov-report=term-missing
 
 ## API Endpoints
 
-- `GET /` - Landing page
-- `GET /health` - Health check
-- `GET /docs` - Swagger UI documentation
-- `GET /redoc` - ReDoc documentation
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Landing page |
+| `/health` | GET | Health check (model status, version) |
+| `/predict` | POST | Score a single lead — returns `{score, label, inference_ms}` |
+| `/predict/batch` | POST | Score up to 10,000 leads in one call |
+| `/docs` | GET | Swagger UI documentation |
+| `/redoc` | GET | ReDoc documentation |
 
-See `/docs` for detailed API schema.
+**Example request:**
+```bash
+curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space/predict \
+  -H "Content-Type: application/json" \
+  -d '{"jobtitle": "CTO", "industry": "tech", "companysize": "11-50", "llm_quality": 80}'
+```
+
+**Example response:**
+```json
+{"score": 0.73, "label": "engaged", "inference_ms": 0.21, "model_version": "0.3.0"}
+```
 
 ## Project Structure
 
@@ -110,26 +156,40 @@ See `/docs` for detailed API schema.
 oc6-linkedin-lead-scoring/
 ├── src/linkedin_lead_scoring/        # Main package
 │   ├── api/                          # FastAPI application
-│   │   ├── main.py                   # API entry point
-│   │   └── static/                   # Static files for landing page
-│   ├── data/                         # Data processing
-│   │   └── utils_data.py             # MLflow-integrated data utilities
-│   ├── models/                       # Training & evaluation (planned)
-│   └── utils/                        # MLflow helpers (planned)
+│   │   ├── main.py                   # App entry point, CORS, exception handlers
+│   │   ├── predict.py                # /predict and /predict/batch endpoints
+│   │   ├── schemas.py                # Pydantic request/response models
+│   │   └── middleware.py             # Request logging, rate limits, tracing
+│   ├── monitoring/                   # Monitoring & optimization
+│   │   ├── drift.py                  # Evidently AI drift detection (DriftDetector)
+│   │   ├── dashboard_utils.py        # Log parsing, metrics, simulation
+│   │   ├── onnx_optimizer.py         # XGBoost-to-ONNX conversion + benchmarks
+│   │   └── profiler.py               # Inference timing (cProfile, perf_counter)
+│   ├── features.py                   # Feature engineering & preprocessing
+│   ├── data/                         # Data processing (LLM enrichment, utils)
+│   └── db/                           # Async DB layer (SQLAlchemy + Supabase)
+├── scripts/
+│   ├── export_model.py               # Re-train & export production artifacts
+│   ├── validate_pipeline.py          # Local-vs-API prediction comparison
+│   ├── optimize_model.py             # ONNX conversion + benchmark
+│   └── profile_api.py               # API load testing
+├── model/                            # Committed production artifacts
+│   ├── xgboost_model.joblib          # Trained XGBoost classifier (47 features)
+│   ├── preprocessor.joblib           # Fitted TargetEncoder pipeline
+│   ├── feature_columns.json          # Ordered feature column names
+│   └── numeric_medians.json          # Median values for imputation
+├── data/
+│   ├── processed/linkedin_leads_clean.csv  # Training data (1,909 rows)
+│   └── reference/training_reference.csv    # Drift detection baseline
+├── streamlit_app.py                  # Monitoring dashboard entry point
 ├── notebooks/                        # Jupyter notebooks with MLflow tracking
-│   ├── 01_linkedin_data_prep.ipynb   # Data preparation & feature engineering
-│   └── 02_linkedin_model_training.ipynb  # Model training & optimization
-├── tests/                            # Test suite (pytest)
-├── data/                             # Raw data (not tracked in git)
-├── mlruns/                           # MLflow tracking data (not tracked in git)
-├── docs/                             # Documentation
-│   ├── PROJECT_SUMMARY.md            # Complete implementation guide
-│   ├── SETUP_ENVIRONMENT.md          # Environment setup instructions
-│   └── BRANCHING_STRATEGY.md         # Git workflow
+├── tests/                            # Test suite (15 files, 299 tests)
+├── .github/workflows/                # CI/CD (ci, staging, production, dashboard, security)
+├── Dockerfile                        # API container for HF Spaces
+├── requirements-prod.txt             # Production API dependencies
+├── requirements-streamlit.txt        # Monitoring dashboard dependencies
 ├── environment.yml                   # Conda environment (scientific packages)
-├── pyproject.toml                    # uv dependencies (ML packages)
-├── setup_env.sh                      # Automated environment setup script
-└── README.md                         # This file
+└── pyproject.toml                    # Project metadata & dev dependencies
 ```
 
 ## Development Workflow
@@ -146,22 +206,27 @@ See `BRANCHING_STRATEGY.md` for detailed workflow.
 
 ```bash
 # Run all tests
-pytest
+python -m pytest tests/ -v --tb=short
 
 # Run with coverage
-pytest --cov=src/linkedin_lead_scoring --cov-report=term-missing
+python -m pytest tests/ --cov=src/linkedin_lead_scoring --cov-report=term-missing
 
-# Run specific test type
-pytest -m integration
+# Validate model pipeline (local predictions match API)
+python scripts/validate_pipeline.py --local-only
 ```
 
-**Current test coverage:** Target 75%+
+**Current status**: 299 tests, 55% overall coverage (93% on production code — two training-only data modules account for the gap).
 
 ## Deployment
 
-Automatic deployment to HF Spaces on push to `main` branch (after tests pass).
+Two-stage deployment via GitHub Actions:
 
-**Live API:** [https://ghislaindelabie-oc6-bizdev-ml-api.hf.space](https://ghislaindelabie-oc6-bizdev-ml-api.hf.space)
+| Environment | Trigger | API URL | Dashboard URL |
+|-------------|---------|---------|---------------|
+| **Staging** | Push to `v0.3.0` | [staging API](https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space) | [staging dashboard](https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space) |
+| **Production** | Push to `main` | [production API](https://ghislaindelabie-oc6-bizdev-ml-api.hf.space) | [production dashboard](https://ghislaindelabie-oc6-bizdev-monitoring.hf.space) |
+
+**Promotion flow:** `feature/* --> v0.3.0 (staging) --> main (production)`
 
 ## MLOps Features
 
@@ -178,18 +243,29 @@ Automatic deployment to HF Spaces on push to `main` branch (after tests pass).
   - Automated setup script for reproducibility
 
 - **Automated Testing:**
-  - pytest with 75%+ coverage requirement
-  - Integration and unit tests
-  - CI/CD pipeline validates before deployment
+  - 299 tests across 15 test files (unit, integration, structural)
+  - Ruff linting on all source and test files
+  - CI/CD pipeline validates before every deployment
 
-- **CI/CD Pipeline:**
-  - GitHub Actions for automated testing and deployment
-  - Auto-deploy to Hugging Face Spaces on merge to main
-  - Git Flow branching strategy for organized releases
+- **CI/CD Pipeline (5 workflows):**
+  - **`ci.yml`**: every push/PR — ruff lint, pytest with coverage gate, Docker build check
+  - **`staging.yml`**: push to `v*.*.*` — deploy API + dashboard to staging HF Spaces
+  - **`production.yml`**: push to `main` — deploy API + dashboard to production HF Spaces
+  - **`dashboard.yml`**: deploy Streamlit monitoring dashboard on push to main
+  - **`security.yml`**: weekly pip-audit (dependency CVEs) + bandit (static analysis)
 
-- **Model Monitoring:** (Planned)
-  - Database logging for predictions (GDPR-compliant)
-  - Drift detection and performance monitoring
+- **Production Logging:**
+  - Async SQLAlchemy + Supabase PostgreSQL for prediction and API metric logging
+  - Tables: `prediction_logs` (score, features, inference time) + `api_metrics` (endpoint, status, latency)
+  - Local dev falls back to SQLite automatically (no setup needed)
+  - Alembic migrations in `alembic/` — run `alembic upgrade head` before first deploy
+
+- **Model Monitoring:**
+  - Evidently AI drift detection (data drift + prediction score drift)
+  - Streamlit monitoring dashboard (`streamlit_app.py`) with live metrics
+  - ONNX Runtime optimization: 26.5x inference speedup over joblib
+  - Performance profiling with cProfile and tracemalloc
+  - See `docs/MONITORING_GUIDE.md` and `docs/PERFORMANCE_REPORT.md`
 
 ## License
 

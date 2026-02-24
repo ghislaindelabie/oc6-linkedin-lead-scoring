@@ -1,43 +1,50 @@
 # Dockerfile for HF Spaces deployment
-# Optimized for FastAPI deployment with ML model
+# Follows HF Spaces Docker permissions pattern:
+# https://huggingface.co/docs/hub/en/spaces-sdks-docker
 
 FROM python:3.11-slim
 
-WORKDIR /app
-
-# Install system dependencies
+# Install system dependencies as root
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libgomp1 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install dependencies
-COPY requirements-prod.txt .
+# Create non-root user (HF Spaces expects UID 1000)
+RUN useradd -m -u 1000 user
+USER user
+
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+WORKDIR $HOME/app
+
+# Install Python dependencies as user
+COPY --chown=user requirements-prod.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-prod.txt
 
-# Copy application code
-COPY src/ ./src/
-COPY model/ ./model/
-COPY README.md .
-
-# Create non-root user
-RUN useradd -m -u 1000 apiuser && \
-    chown -R apiuser:apiuser /app
-USER apiuser
+# Copy project files
+COPY --chown=user src/ ./src/
+COPY --chown=user model/ ./model/
+COPY --chown=user alembic/ ./alembic/
+COPY --chown=user alembic.ini .
 
 # Expose HF Spaces port
 EXPOSE 7860
 
-# Environment variables
+# Environment variables — PYTHONPATH makes the package importable
+# without pip install (all runtime deps come from requirements-prod.txt)
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    APP_ENV=production
+    APP_ENV=production \
+    PYTHONPATH=/home/user/app/src
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:7860/health')" || exit 1
+# Health check using stdlib urllib (no requests library needed)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')" || exit 1
 
-# Run FastAPI
-CMD ["uvicorn", "src.linkedin_lead_scoring.api.main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Run DB migrations (non-fatal — API can operate without DB) then start the server
+CMD ["sh", "-c", "alembic upgrade head || echo 'WARNING: alembic migration failed, starting without DB'; exec uvicorn linkedin_lead_scoring.api.main:app --host 0.0.0.0 --port 7860"]

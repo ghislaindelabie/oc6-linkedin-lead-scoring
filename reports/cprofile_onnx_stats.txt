@@ -1,0 +1,16 @@
+         901 function calls in 0.001 seconds
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      100    0.000    0.000    0.001    0.000 /Users/ghislaindelabie/Projets dév/Formation OC/OC6 - Initiez-vous au MLOps/oc6-linkedin-lead-scoring/worktrees/session-c/src/linkedin_lead_scoring/monitoring/onnx_optimizer.py:104(predict_proba)
+      100    0.000    0.000    0.000    0.000 /opt/anaconda3/envs/oc6/lib/python3.11/site-packages/onnxruntime/capi/onnxruntime_inference_collection.py:278(run)
+      100    0.000    0.000    0.000    0.000 {built-in method onnxruntime.capi.onnxruntime_pybind11_state.run}
+      100    0.000    0.000    0.000    0.000 /opt/anaconda3/envs/oc6/lib/python3.11/site-packages/onnxruntime/capi/onnxruntime_inference_collection.py:294(<listcomp>)
+      100    0.000    0.000    0.000    0.000 /opt/anaconda3/envs/oc6/lib/python3.11/site-packages/onnxruntime/capi/onnxruntime_inference_collection.py:268(_validate_input)
+      200    0.000    0.000    0.000    0.000 {built-in method numpy.asarray}
+      100    0.000    0.000    0.000    0.000 {built-in method builtins.isinstance}
+      100    0.000    0.000    0.000    0.000 {method 'keys' of 'dict' objects}
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+
+

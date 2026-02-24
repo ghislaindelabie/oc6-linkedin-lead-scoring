@@ -3,6 +3,12 @@
 .vscode/
 .idea/
 
+# Claude Code local settings (personal, not shared)
+.claude/settings.local.json
+
+# Git worktrees
+worktrees/
+
 # Python
 __pycache__/
 *.pyc
@@ -36,6 +42,9 @@ mlflow.db
 # model/*.pkl
 # model/*.joblib
 
+# Runtime logs (keep directory structure, ignore content)
+logs/*.jsonl
+
 # Test artifacts
 .coverage
 coverage.xml
@@ -45,6 +54,3 @@ htmlcov/
 # Documentation (local only)
 docs/notes/
 docs/session log.md
-
-# Alembic
-alembic.ini

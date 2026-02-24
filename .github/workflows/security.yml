@@ -1,0 +1,94 @@
+name: Security Scan
+
+on:
+  schedule:
+    # Every Sunday at midnight UTC
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+jobs:
+  pip-audit:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit on production dependencies
+        run: |
+          pip-audit -r requirements-prod.txt --output-format json \
+            --output pip-audit-results.json
+
+      - name: Upload pip-audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-results
+          path: pip-audit-results.json
+          retention-days: 30
+
+  bandit:
+    name: Static Security Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install bandit
+        run: pip install bandit
+
+      - name: Run bandit on source code
+        run: |
+          bandit -r src/ -ll --format json \
+            --output bandit-results.json
+
+      - name: Upload bandit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-results
+          path: bandit-results.json
+          retention-days: 30
+
+  nuclei:
+    name: Nuclei Web Security Scan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: "https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space"
+            mode: "full"
+            name: "staging"
+          - target: "https://ghislaindelabie-oc6-bizdev-ml-api.hf.space"
+            mode: "safe"
+            name: "production"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Nuclei (${{ matrix.name }})
+        uses: projectdiscovery/nuclei-action@main
+        with:
+          target: ${{ matrix.target }}
+          flags: "-severity low,medium,high,critical -json"
+          output: nuclei-results-${{ matrix.name }}.json
+        continue-on-error: true
+
+      - name: Upload Nuclei results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nuclei-results-${{ matrix.name }}
+          path: nuclei-results-${{ matrix.name }}.json
+          retention-days: 30
