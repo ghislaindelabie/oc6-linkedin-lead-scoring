@@ -2,6 +2,6 @@
   "llm_quality": 70.0,
   "llm_engagement": 0.55,
   "llm_decision_maker": 0.5,
-  "llm_company_fit": 0.0,
+  "llm_company_fit": 1.0,
   "companyfoundedon": 2016.5
 }
