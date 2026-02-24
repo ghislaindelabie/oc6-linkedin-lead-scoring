@@ -148,6 +148,34 @@ class TestSecurityWorkflow:
         assert any("3.11" in v for v in python_versions), \
             "security.yml must use Python 3.11"
 
+    def test_security_has_nuclei_job(self):
+        data = load_yaml(SECURITY_YML)
+        assert "nuclei" in data["jobs"], \
+            "security.yml must have a 'nuclei' job"
+
+    def test_security_nuclei_scans_staging_and_production(self):
+        data = load_yaml(SECURITY_YML)
+        nuclei_job = data["jobs"]["nuclei"]
+        strategy = nuclei_job.get("strategy", {})
+        matrix = strategy.get("matrix", {})
+        include = matrix.get("include", [])
+        targets = [entry.get("target", "") for entry in include]
+        names = [entry.get("name", "") for entry in include]
+        assert any("staging" in t for t in targets), \
+            "nuclei job must scan the staging target"
+        assert any("staging" in n for n in names), \
+            "nuclei job matrix must include a 'staging' entry"
+        assert any(
+            "staging" not in t and "hf.space" in t for t in targets
+        ), "nuclei job must also scan the production target"
+
+    def test_security_nuclei_uploads_results(self):
+        data = load_yaml(SECURITY_YML)
+        nuclei_steps = data["jobs"]["nuclei"].get("steps", [])
+        uses_values = " ".join(s.get("uses", "") for s in nuclei_steps)
+        assert "upload-artifact" in uses_values, \
+            "nuclei job must upload scan results as artifacts"
+
 
 # ---------------------------------------------------------------------------
 # dashboard.yml tests
@@ -255,6 +283,37 @@ class TestStagingWorkflow:
         )
         assert "HF_TOKEN" in env_keys, \
             "staging.yml must use HF_TOKEN secret"
+
+    def test_staging_has_e2e_tests_job(self):
+        data = load_yaml(STAGING_YML)
+        assert "e2e-tests" in data["jobs"], \
+            "staging.yml must have an 'e2e-tests' job"
+
+    def test_staging_e2e_needs_deploy_jobs(self):
+        data = load_yaml(STAGING_YML)
+        e2e_job = data["jobs"]["e2e-tests"]
+        needs = e2e_job.get("needs", [])
+        if isinstance(needs, str):
+            needs = [needs]
+        assert "deploy-staging-api" in needs, \
+            "e2e-tests must depend on deploy-staging-api"
+
+    def test_staging_e2e_runs_pytest(self):
+        data = load_yaml(STAGING_YML)
+        e2e_steps = data["jobs"]["e2e-tests"].get("steps", [])
+        run_commands = " ".join(s.get("run", "") for s in e2e_steps)
+        assert "pytest" in run_commands, \
+            "e2e-tests job must run pytest"
+
+    def test_staging_e2e_sets_staging_url(self):
+        data = load_yaml(STAGING_YML)
+        e2e_steps = data["jobs"]["e2e-tests"].get("steps", [])
+        env_keys = " ".join(
+            k for s in e2e_steps
+            for k in (s.get("env", {}) or {}).keys()
+        )
+        assert "STAGING_URL" in env_keys, \
+            "e2e-tests job must set STAGING_URL environment variable"
 
     def test_staging_dashboard_sets_api_endpoint(self):
         content = STAGING_YML.read_text()
