@@ -207,20 +207,31 @@ jobs:
 
       - name: Wait for staging to be ready
         run: |
-          echo "Waiting 60s for staging Space to rebuild..."
+          echo "Waiting 60s for staging Spaces to rebuild..."
           sleep 60
+
+          echo "--- Checking API ---"
           for i in $(seq 1 10); do
             if curl -sf "https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space/health" > /dev/null 2>&1; then
               echo "Staging API is ready!"
-              exit 0
+              break
             fi
-            echo "Attempt $i/10 — waiting 30s..."
+            echo "API attempt $i/10 — waiting 30s..."
             sleep 30
           done
-          echo "Staging API did not become ready in time"
-          exit 1
+
+          echo "--- Checking Dashboard ---"
+          for i in $(seq 1 10); do
+            if curl -sf "https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space/_stcore/health" > /dev/null 2>&1; then
+              echo "Staging Dashboard is ready!"
+              break
+            fi
+            echo "Dashboard attempt $i/10 — waiting 30s..."
+            sleep 30
+          done
 
       - name: Run E2E tests
         env:
           STAGING_URL: "https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space"
+          DASHBOARD_URL: "https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space"
         run: pytest tests/test_e2e.py -v --tb=short

@@ -315,6 +315,16 @@ class TestStagingWorkflow:
         assert "STAGING_URL" in env_keys, \
             "e2e-tests job must set STAGING_URL environment variable"
 
+    def test_staging_e2e_sets_dashboard_url(self):
+        data = load_yaml(STAGING_YML)
+        e2e_steps = data["jobs"]["e2e-tests"].get("steps", [])
+        env_keys = " ".join(
+            k for s in e2e_steps
+            for k in (s.get("env", {}) or {}).keys()
+        )
+        assert "DASHBOARD_URL" in env_keys, \
+            "e2e-tests job must set DASHBOARD_URL environment variable"
+
     def test_staging_dashboard_sets_api_endpoint(self):
         content = STAGING_YML.read_text()
         assert "API_ENDPOINT" in content, \

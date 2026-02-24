@@ -1,6 +1,6 @@
-"""E2E tests for the staging API using httpx.
+"""E2E tests for the staging API and dashboard using httpx.
 
-These tests are designed to run against the live staging API.
+These tests are designed to run against the live staging services.
 They're skipped in normal CI (no STAGING_URL env var) and only
 run post-deploy in the staging workflow.
 """
@@ -9,6 +9,7 @@ import pytest
 import httpx
 
 STAGING_URL = os.getenv("STAGING_URL", "")
+DASHBOARD_URL = os.getenv("DASHBOARD_URL", "")
 
 pytestmark = pytest.mark.skipif(
     not STAGING_URL,
@@ -82,3 +83,19 @@ class TestE2EValidation:
     def test_docs_endpoint_accessible(self):
         resp = httpx.get(f"{STAGING_URL}/docs", timeout=30, follow_redirects=True)
         assert resp.status_code == 200
+
+
+@pytest.mark.skipif(not DASHBOARD_URL, reason="DASHBOARD_URL not set")
+class TestE2EDashboard:
+    """Verify the Streamlit monitoring dashboard is running."""
+
+    def test_dashboard_streamlit_health(self):
+        """Streamlit internal health endpoint must respond."""
+        resp = httpx.get(f"{DASHBOARD_URL}/_stcore/health", timeout=30)
+        assert resp.status_code == 200
+
+    def test_dashboard_main_page_loads(self):
+        """Main page must return 200 (HTML with Streamlit app)."""
+        resp = httpx.get(DASHBOARD_URL, timeout=30, follow_redirects=True)
+        assert resp.status_code == 200
+        assert "streamlit" in resp.text.lower() or "stApp" in resp.text
