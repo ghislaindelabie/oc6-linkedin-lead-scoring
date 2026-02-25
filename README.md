@@ -19,7 +19,7 @@ This tool helps business development and sales teams **score LinkedIn prospects*
 - **Output**: Engagement probability score (0-1) with confidence level → label as "engaged" or "not_engaged"
 - **Business impact**: Focus outreach effort on high-probability prospects, reducing wasted messages, improving conversion rates
 
-**Example scenario**: You have 500 potential leads in your target market. Without scoring, you send 500 outreach messages with a 5% response rate (25 replies). By using this model to rank prospects, you send only to the top-200 highest-scoring contacts and achieve a 15% response rate (30 replies) using 40% fewer messages.
+**Example scenario**: You have 500 potential leads in your target market. Your baseline response rate is 20% (100 replies). By using this model to filter and prioritize high-engagement prospects, you improve response rate to 40% (200 replies) — doubling your success rate and significantly improving pipeline quality.
 
 ## Project Overview
 
