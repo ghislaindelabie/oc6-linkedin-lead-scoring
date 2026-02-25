@@ -1,0 +1,34 @@
+#!/bin/bash
+# Pre-push hook: block direct pushes to main/master branches.
+#
+# This catches ALL push forms that target protected branches:
+#   git push origin main
+#   git push                          (bare — defaults to upstream)
+#   git push origin HEAD              (pushes current branch by name)
+#   git push origin HEAD:main         (explicit refspec)
+#   git push origin some-branch:main  (any refspec targeting main)
+#
+# Install: cp hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+# Or run:  scripts/setup_hooks.sh
+# Bypass (emergency only): git push --no-verify
+
+PROTECTED_BRANCHES="^refs/heads/(main|master)$"
+
+while read local_ref local_sha remote_ref remote_sha; do
+    if [[ "$remote_ref" =~ $PROTECTED_BRANCHES ]]; then
+        branch_name="${remote_ref#refs/heads/}"
+        echo ""
+        echo "  BLOCKED: push to '$branch_name' rejected by pre-push hook."
+        echo ""
+        echo "  Direct pushes to protected branches are not allowed."
+        echo "  Use a feature or hotfix branch and create a PR instead:"
+        echo ""
+        echo "    git checkout -b hotfix/my-fix"
+        echo "    git push origin hotfix/my-fix"
+        echo "    gh pr create --base main"
+        echo ""
+        exit 1
+    fi
+done
+
+exit 0

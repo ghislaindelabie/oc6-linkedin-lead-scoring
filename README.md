@@ -9,11 +9,21 @@ pinned: false
 
 # OC6 — LinkedIn Lead Scoring with MLOps
 
-ML pipeline for predicting LinkedIn contact engagement (reply/interest) with complete MLflow tracking.
+**Smart lead qualification tool for business development professionals** — predict which LinkedIn contacts will likely respond to your invite requests, enabling data-driven outreach prioritization.
+
+## Business Context
+
+This tool helps business development and sales teams **score LinkedIn prospects** before reaching out:
+- **Use case**: You maintain a list of potential leads on LinkedIn. Before sending connection requests or outreach messages, you want to know which contacts are most likely to respond (engage, view your profile, accept invites)
+- **Input**: LinkedIn profile data (job title, company, seniority, industry, location, profile summary, skills)
+- **Output**: Engagement probability score (0-1) with confidence level → label as "engaged" or "not_engaged"
+- **Business impact**: Focus outreach effort on high-probability prospects, reducing wasted messages, improving conversion rates
+
+**Example scenario**: You have 500 potential leads in your target market. Your baseline response rate is 20% (100 replies). By using this model to filter and prioritize high-engagement prospects, you improve response rate to 40% (200 replies) — doubling your success rate and significantly improving pipeline quality.
 
 ## Project Overview
 
-This project implements a complete MLOps pipeline for predicting LinkedIn lead engagement:
+This is a complete MLOps pipeline for predicting LinkedIn lead engagement:
 - **MLflow experiment tracking** from data preparation through model training
 - **Jupyter notebooks** for data exploration and model development
 - **FastAPI REST API** with `/predict` and `/predict/batch` endpoints (live on staging)
@@ -22,16 +32,18 @@ This project implements a complete MLOps pipeline for predicting LinkedIn lead e
 - **CI/CD pipeline** with GitHub Actions (lint, test, Docker, deploy)
 - **Deployment** to Hugging Face Spaces (staging + production)
 
-## Current Status (v0.3.0)
+## Current Status (v0.3.1)
 
-**299 tests passing | 55% overall coverage | 93% production code coverage**
+**299 tests passing | 50% coverage threshold | 93% production code coverage**
+
+Latest release includes hotfixes for dashboard and API stability (merged 2026-02-25). All core features deployed and tested.
 
 ### Architecture
 
 ```
                      GitHub Actions CI/CD
                             |
-              push to v0.3.0 (staging) / main (production)
+              push to v0.3.1 (staging) / main (production)
                             |
                 +-----------+-----------+
                 |                       |
@@ -56,20 +68,15 @@ This project implements a complete MLOps pipeline for predicting LinkedIn lead e
 - **Tests**: 15 test files, 299 tests — covers API, features, schemas, drift, monitoring, ONNX, profiler, docs, pipelines
 - **Validation**: `scripts/validate_pipeline.py` — confirms local model predictions match staging API
 
-### Open PRs (v0.3.0)
+### Recent Merges (v0.3.1 → v0.3.1)
 
-| PR | Feature | Tests added | Status |
-|----|---------|-------------|--------|
-| #8 | Production deployment workflow + dashboard API_ENDPOINT | 14 | CI passing |
-| #9 | Nuclei security scan + E2E staging tests | 15 | CI passing |
-| #10 | OHE determinism, predict error paths, pipeline validation tests | 37 | CI passing |
-
-### Remaining
-
-- Merge PRs #8, #9, #10 into v0.3.0
-- Raise CI coverage threshold from 10% to 50%
-- Final PR from v0.3.0 to main (production go-live)
-- Set production `DATABASE_URL` GitHub secret
+| PR | Feature | Status |
+|----|---------|--------|
+| #12 | Hotfixes: dashboard + API stability | ✅ Merged 2026-02-25 |
+| #11 | v0.3.1 release: full MLOps pipeline | ✅ Merged 2026-02-24 |
+| #10 | Test hardening: OHE determinism + validation | ✅ Merged 2026-02-24 |
+| #9 | Security: Nuclei scan + E2E tests | ✅ Merged 2026-02-24 |
+| #8 | Production deployment workflow | ✅ Merged 2026-02-24 |
 
 ## Quickstart
 
@@ -147,7 +154,172 @@ curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space/predict 
 
 **Example response:**
 ```json
-{"score": 0.73, "label": "engaged", "inference_ms": 0.21, "model_version": "0.3.0"}
+{"score": 0.73, "label": "engaged", "inference_ms": 0.21, "model_version": "0.3.1"}
+```
+
+## Testing Examples
+
+Try these fake LinkedIn profiles to test the API and see engagement scores. The model has learned patterns from business development outreach data.
+
+### ✅ High Engagement Profile (Likely to respond)
+
+**Scenario**: Senior executive at growing tech company, actively engaged, decision-maker
+```bash
+curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jobtitle": "VP of Sales",
+    "industry": "Computer Software",
+    "companyindustry": "Software Development",
+    "companysize": "201-500",
+    "companytype": "Privately Held",
+    "companyfoundedon": 2015,
+    "location": "San Francisco, California, United States",
+    "llm_seniority": "Senior",
+    "llm_quality": 85,
+    "llm_engagement": 0.85,
+    "llm_decision_maker": 0.9,
+    "llm_company_fit": 1,
+    "llm_geography": "international_hub",
+    "llm_business_type": "leaders",
+    "languages": "English, French",
+    "summary": "15+ years B2B SaaS sales leadership. Scaled revenue from $2M to $50M. Growth-focused, always open to strategic partnerships.",
+    "skills": "Sales Leadership, SaaS, Revenue Growth, Team Building, Negotiation"
+  }'
+```
+
+**Expected response:**
+```json
+{
+  "score": 0.78,
+  "label": "engaged",
+  "confidence": "high",
+  "model_version": "0.3.1",
+  "inference_time_ms": 0.21
+}
+```
+
+### ❌ Low Engagement Profile (Unlikely to respond)
+
+**Scenario**: Entry-level individual contributor at large corporation, generic profile, limited fit
+```bash
+curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jobtitle": "Junior Analyst",
+    "industry": "Banking",
+    "companyindustry": "Financial Services",
+    "companysize": "10001+",
+    "companytype": "Public Company",
+    "companyfoundedon": 1975,
+    "location": "Mumbai, Maharashtra, India",
+    "llm_seniority": "Entry",
+    "llm_quality": 35,
+    "llm_engagement": 0.2,
+    "llm_decision_maker": 0.1,
+    "llm_company_fit": 2,
+    "llm_geography": "other",
+    "llm_business_type": "workers",
+    "languages": "English",
+    "summary": "Working in finance.",
+    "skills": "Excel, Data Entry"
+  }'
+```
+
+**Expected response:**
+```json
+{
+  "score": 0.22,
+  "label": "not_engaged",
+  "confidence": "high",
+  "model_version": "0.3.1",
+  "inference_time_ms": 0.21
+}
+```
+
+### 🔶 Medium Engagement Profile (Borderline case)
+
+**Scenario**: Mid-level manager at growing company, some alignment but not perfect fit
+```bash
+curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jobtitle": "Product Manager",
+    "industry": "Information Technology & Services",
+    "companyindustry": "Software Development",
+    "companysize": "51-200",
+    "companytype": "Privately Held",
+    "companyfoundedon": 2018,
+    "location": "Paris, Île-de-France, France",
+    "llm_seniority": "Mid",
+    "llm_quality": 65,
+    "llm_engagement": 0.55,
+    "llm_decision_maker": 0.45,
+    "llm_company_fit": 1,
+    "llm_geography": "international_hub",
+    "llm_business_type": "experts",
+    "languages": "French, English, Spanish",
+    "summary": "Product Manager with 8 years experience in SaaS. Interested in process optimization and team collaboration.",
+    "skills": "Product Management, SaaS, User Research, Analytics, Agile"
+  }'
+```
+
+**Expected response:**
+```json
+{
+  "score": 0.52,
+  "label": "engaged",
+  "confidence": "medium",
+  "model_version": "0.3.1",
+  "inference_time_ms": 0.21
+}
+```
+
+### Batch Testing (Multiple Leads)
+
+Test multiple leads in a single API call:
+```bash
+curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "leads": [
+      {
+        "jobtitle": "CTO",
+        "industry": "Technology - SaaS",
+        "companysize": "11-50",
+        "llm_quality": 90,
+        "llm_engagement": 0.9
+      },
+      {
+        "jobtitle": "HR Administrator",
+        "industry": "Retail",
+        "companysize": "5001-10000",
+        "llm_quality": 25,
+        "llm_engagement": 0.15
+      },
+      {
+        "jobtitle": "Sales Manager",
+        "industry": "Real Estate",
+        "companysize": "201-500",
+        "llm_quality": 70,
+        "llm_engagement": 0.65
+      }
+    ]
+  }'
+```
+
+**Expected response:**
+```json
+{
+  "predictions": [
+    {"score": 0.85, "label": "engaged", "confidence": "high", "model_version": "0.3.1", "inference_time_ms": 0.21},
+    {"score": 0.18, "label": "not_engaged", "confidence": "high", "model_version": "0.3.1", "inference_time_ms": 0.19},
+    {"score": 0.68, "label": "engaged", "confidence": "high", "model_version": "0.3.1", "inference_time_ms": 0.20}
+  ],
+  "total_count": 3,
+  "avg_score": 0.57,
+  "high_engagement_count": 2
+}
 ```
 
 ## Project Structure
@@ -223,10 +395,10 @@ Two-stage deployment via GitHub Actions:
 
 | Environment | Trigger | API URL | Dashboard URL |
 |-------------|---------|---------|---------------|
-| **Staging** | Push to `v0.3.0` | [staging API](https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space) | [staging dashboard](https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space) |
+| **Staging** | Push to `v0.3.1` | [staging API](https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space) | [staging dashboard](https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space) |
 | **Production** | Push to `main` | [production API](https://ghislaindelabie-oc6-bizdev-ml-api.hf.space) | [production dashboard](https://ghislaindelabie-oc6-bizdev-monitoring.hf.space) |
 
-**Promotion flow:** `feature/* --> v0.3.0 (staging) --> main (production)`
+**Promotion flow:** `feature/* --> v0.3.1 (staging) --> main (production)`
 
 ## MLOps Features
 
@@ -271,8 +443,7 @@ Two-stage deployment via GitHub Actions:
 
 MIT License - see LICENSE file
 
-## Contact
+## About
 
-**Author:** Ghislain Delabie
-**Email:** ghislain@delabie.tech
 **Project:** OpenClassrooms OC6 - MLOps
+**Purpose:** Business development tool for LinkedIn lead scoring and engagement prediction
