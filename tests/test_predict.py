@@ -1,5 +1,6 @@
 """Unit tests for /predict and /predict/batch endpoints (Tasks B.2, B.3)"""
 import pytest
+from fastapi.middleware.cors import CORSMiddleware
 
 VALID_LEAD = {
     "llm_quality": 75,
@@ -224,6 +225,32 @@ class TestCORS:
             },
         )
         assert "access-control-allow-origin" in response.headers
+
+    def test_cors_allow_headers_is_not_wildcard(self):
+        """CORS must not use allow_headers='*' — explicit list required."""
+        from linkedin_lead_scoring.api.main import app
+
+        for middleware in app.user_middleware:
+            if middleware.cls is CORSMiddleware:
+                allow_headers = middleware.kwargs.get("allow_headers", [])
+                assert "*" not in allow_headers, \
+                    "CORS allow_headers must be an explicit list, not ['*']"
+                return
+        pytest.fail("CORSMiddleware not found on the app")
+
+    def test_cors_allows_required_headers(self):
+        """CORS must allow Content-Type and X-Request-ID headers."""
+        from linkedin_lead_scoring.api.main import app
+
+        for middleware in app.user_middleware:
+            if middleware.cls is CORSMiddleware:
+                allow_headers = [h.lower() for h in middleware.kwargs.get("allow_headers", [])]
+                assert "content-type" in allow_headers, \
+                    "CORS must allow Content-Type header"
+                assert "x-request-id" in allow_headers, \
+                    "CORS must allow X-Request-ID header"
+                return
+        pytest.fail("CORSMiddleware not found on the app")
 
 
 # ---------------------------------------------------------------------------

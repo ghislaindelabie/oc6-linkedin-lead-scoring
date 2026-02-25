@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 DOCKERFILE_PATH = Path(__file__).parent.parent / "Dockerfile"
+DOCKERFILE_STREAMLIT_PATH = Path(__file__).parent.parent / "Dockerfile.streamlit"
 
 
 @pytest.fixture(scope="module")
@@ -86,3 +87,45 @@ class TestDockerfileAlembic:
             "Dockerfile must run 'alembic upgrade head' before starting the server"
         assert alembic_pos < uvicorn_pos, \
             "'alembic upgrade head' must appear before 'uvicorn' in the Dockerfile"
+
+
+# ---------------------------------------------------------------------------
+# Dockerfile.streamlit
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def streamlit_dockerfile_content() -> str:
+    """Read Dockerfile.streamlit once for all tests in this module."""
+    return DOCKERFILE_STREAMLIT_PATH.read_text()
+
+
+class TestDockerfileStreamlitSecurity:
+    def test_streamlit_dockerfile_exists(self):
+        assert DOCKERFILE_STREAMLIT_PATH.exists(), \
+            "Dockerfile.streamlit must exist at project root"
+
+    def test_creates_non_root_user(self, streamlit_dockerfile_content):
+        """Dockerfile.streamlit must create a non-root user (UID 1000)."""
+        assert "useradd" in streamlit_dockerfile_content, \
+            "Dockerfile.streamlit must create a non-root user with useradd"
+
+    def test_switches_to_non_root_user(self, streamlit_dockerfile_content):
+        """Dockerfile.streamlit must switch to non-root user via USER directive."""
+        lines = streamlit_dockerfile_content.splitlines()
+        user_lines = [l.strip() for l in lines if l.strip().startswith("USER")]
+        assert any("user" in l.lower() and "root" not in l.lower()
+                    for l in user_lines), \
+            "Dockerfile.streamlit must have a USER directive for a non-root user"
+
+    def test_copy_uses_chown(self, streamlit_dockerfile_content):
+        """COPY directives after USER switch should use --chown."""
+        lines = streamlit_dockerfile_content.splitlines()
+        found_user = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("USER") and "root" not in stripped.lower():
+                found_user = True
+            if found_user and stripped.startswith("COPY"):
+                assert "--chown=" in stripped, \
+                    f"COPY after USER must use --chown: {stripped}"

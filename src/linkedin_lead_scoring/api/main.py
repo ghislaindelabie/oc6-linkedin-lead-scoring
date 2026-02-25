@@ -35,7 +35,7 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["POST", "GET", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "X-Request-ID", "Authorization"],
 )
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(RateLimitHeadersMiddleware)
