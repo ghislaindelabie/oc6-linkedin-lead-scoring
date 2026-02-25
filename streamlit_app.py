@@ -66,7 +66,7 @@ API_REQUESTS_LOG = os.getenv("API_REQUESTS_LOG", "logs/api_requests.jsonl")
 REFERENCE_DATA_PATH = os.getenv(
     "REFERENCE_DATA_PATH", "data/reference/training_reference.csv"
 )
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:7860")
+API_BASE_URL = os.getenv("API_ENDPOINT", os.getenv("API_BASE_URL", "http://localhost:7860"))
 REPORTS_DIR = Path("reports")
 
 # ---------------------------------------------------------------------------
@@ -127,10 +127,11 @@ def get_reference_data() -> pd.DataFrame:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _generate_drift_report(
-    detector: DriftDetector, prod_df: "pd.DataFrame", output_path: str
+    ref_df: "pd.DataFrame", prod_df: "pd.DataFrame", output_path: str
 ) -> None:
     """Generate and write the Evidently HTML drift report (cached 5 min)."""
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    detector = DriftDetector(reference_data=ref_df)
     detector.generate_report(prod_df, output_path=output_path)
 
 
@@ -284,7 +285,7 @@ else:
         if st.button("Generate / refresh drift report"):
             st.cache_data.clear()
         report_path = str(REPORTS_DIR / "drift_report.html")
-        _generate_drift_report(detector, prod_df[common_cols], report_path)
+        _generate_drift_report(ref_df[common_cols], prod_df[common_cols], report_path)
         with open(report_path, "r", encoding="utf-8") as f:
             html = f.read()
         components.html(html, height=600, scrolling=True)

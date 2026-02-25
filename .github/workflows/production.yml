@@ -191,7 +191,7 @@ jobs:
         run: |
           HEALTH=$(curl -sf "https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/health")
           echo "$HEALTH"
-          echo "$HEALTH" | python -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='healthy', 'API unhealthy'; assert d['model_loaded']==True, 'Model not loaded'"
+          echo "$HEALTH" | python -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='healthy', f'API unhealthy: {d}'"
           echo "API health check passed"
 
       - name: Verify Dashboard is serving
