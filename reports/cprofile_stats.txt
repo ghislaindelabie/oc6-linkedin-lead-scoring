@@ -1,0 +1,38 @@
+         20901 function calls (20801 primitive calls) in 0.035 seconds
+
+   Ordered by: cumulative time
+   List reduced from 104 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      100    0.000    0.000    0.035    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/sklearn.py:1869(predict_proba)
+  200/100    0.001    0.000    0.033    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/core.py:732(inner_f)
+      100    0.000    0.000    0.033    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/sklearn.py:1401(predict)
+      100    0.015    0.000    0.026    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/core.py:2728(inplace_predict)
+      100    0.000    0.000    0.007    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/core.py:437(_prediction_output)
+      200    0.000    0.000    0.005    0.000 {built-in method builtins.next}
+      200    0.000    0.000    0.004    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/config.py:156(config_context)
+      400    0.000    0.000    0.004    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/config.py:107(wrap)
+      100    0.000    0.000    0.004    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/_data_utils.py:112(from_array_interface)
+      100    0.000    0.000    0.003    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/contextlib.py:132(__enter__)
+      400    0.000    0.000    0.002    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/json/__init__.py:183(dumps)
+      200    0.001    0.000    0.002    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/config.py:116(set_config)
+      400    0.001    0.000    0.002    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/json/encoder.py:183(encode)
+      100    0.001    0.000    0.002    0.000 {built-in method builtins.__build_class__}
+      100    0.000    0.000    0.002    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/contextlib.py:141(__exit__)
+      100    0.001    0.000    0.002    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/config.py:136(get_config)
+      100    0.000    0.000    0.002    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/_data_utils.py:183(make_array_interface)
+      200    0.000    0.000    0.002    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/numpy/_core/fromnumeric.py:3287(prod)
+      200    0.000    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/numpy/_core/fromnumeric.py:66(_wrapreduction)
+      400    0.001    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/json/encoder.py:205(iterencode)
+      100    0.000    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/sklearn.py:1671(_cls_predict_proba)
+      100    0.001    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/core.py:401(ctypes2numpy)
+      100    0.000    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/_data_utils.py:496(array_interface)
+      100    0.001    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/_data_utils.py:115(Array)
+      100    0.000    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/_data_utils.py:152(size)
+      100    0.000    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/core.py:139(make_jcargs)
+      100    0.000    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/sklearn.py:1388(_get_iteration_range)
+      100    0.000    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/json/__init__.py:299(loads)
+      100    0.000    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/numpy/_core/shape_base.py:218(vstack)
+      100    0.000    0.000    0.001    0.000 /opt/anaconda3/envs/OC6/lib/python3.11/site-packages/xgboost/sklearn.py:1570(best_iteration)
+
+

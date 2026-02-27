@@ -1,25 +1,32 @@
 FROM python:3.11-slim
 
-WORKDIR /app
-
 # Install system deps for scipy/numpy wheel builds (if needed)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-streamlit.txt .
+# Create non-root user (HF Spaces expects UID 1000)
+RUN useradd -m -u 1000 user
+USER user
+
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+WORKDIR $HOME/app
+
+COPY --chown=user requirements-streamlit.txt .
 RUN pip install --no-cache-dir -r requirements-streamlit.txt
 
 # Copy monitoring package and package metadata (required for pip install -e .)
-COPY pyproject.toml .
-COPY src/linkedin_lead_scoring/monitoring/ ./src/linkedin_lead_scoring/monitoring/
-COPY src/linkedin_lead_scoring/__init__.py ./src/linkedin_lead_scoring/__init__.py
+COPY --chown=user pyproject.toml .
+COPY --chown=user src/linkedin_lead_scoring/monitoring/ ./src/linkedin_lead_scoring/monitoring/
+COPY --chown=user src/linkedin_lead_scoring/__init__.py ./src/linkedin_lead_scoring/__init__.py
 
 # Install the monitoring package
 RUN pip install --no-cache-dir -e .
 
 # Copy the dashboard entrypoint
-COPY streamlit_app.py .
+COPY --chown=user streamlit_app.py .
 
 # Create directories for logs and reports
 RUN mkdir -p logs reports data/reference
