@@ -113,9 +113,9 @@ class TestDockerfileStreamlitSecurity:
     def test_switches_to_non_root_user(self, streamlit_dockerfile_content):
         """Dockerfile.streamlit must switch to non-root user via USER directive."""
         lines = streamlit_dockerfile_content.splitlines()
-        user_lines = [l.strip() for l in lines if l.strip().startswith("USER")]
-        assert any("user" in l.lower() and "root" not in l.lower()
-                    for l in user_lines), \
+        user_lines = [line.strip() for line in lines if line.strip().startswith("USER")]
+        assert any("user" in ul.lower() and "root" not in ul.lower()
+                    for ul in user_lines), \
             "Dockerfile.streamlit must have a USER directive for a non-root user"
 
     def test_copy_uses_chown(self, streamlit_dockerfile_content):
