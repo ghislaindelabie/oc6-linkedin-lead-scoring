@@ -1,6 +1,6 @@
-# Monitoring Guide — LinkedIn Lead Scoring v0.3.0
+# Monitoring Guide — LinkedIn Lead Scoring
 
-**Audience**: MLOps engineers and data scientists maintaining the LeadGen scorer system.
+**Audience**: MLOps engineers and data scientists maintaining the lead scoring system.
 
 ---
 
@@ -164,15 +164,15 @@ git push origin feature/your-branch  # triggers GitHub Actions
 
 | Alert | Condition | Severity | Owner |
 |-------|-----------|----------|-------|
-| API down | `/health` fails 3× in 5 min | **Critical** | Infra (Session A) |
-| High error rate | Error rate > 5% over 10 min | **High** | API (Session B) |
-| Slow inference | p95 > 50 ms over 5 min | **Medium** | Monitoring (Session C) |
+| API down | `/health` fails 3× in 5 min | **Critical** | Infrastructure |
+| High error rate | Error rate > 5% over 10 min | **High** | API / Backend |
+| Slow inference | p95 > 50 ms over 5 min | **Medium** | ML Engineering |
 | Data drift detected | `drift_share >= 0.5` | **Medium** | Data science |
 | Prediction drift | `p_value < 0.01` | **Medium** | Data science |
 | Model age > 3 months | Registry `created_at` | **Low** | Data science |
 | Low engagement rate | `engagement_rate < 0.10` | **Low** | Business / data science |
 
-Alerts are currently manual (check dashboard daily). For automated alerting, integrate Uptime Kuma (Session A) with Slack webhooks on the `/health` endpoint.
+Alerts are currently manual (check dashboard daily). For automated alerting, integrate Uptime Kuma with Slack webhooks on the `/health` endpoint.
 
 ---
 

@@ -1,4 +1,4 @@
-# Performance Report — LinkedIn Lead Scoring v0.3.0
+# Performance Report — LinkedIn Lead Scoring
 
 **Date**: 2026-02-20
 **Model**: XGBoost classifier (50 estimators, max_depth=4)

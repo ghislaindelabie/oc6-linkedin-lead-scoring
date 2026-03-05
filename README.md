@@ -7,43 +7,195 @@ sdk: docker
 pinned: false
 ---
 
-# OC6 — LinkedIn Lead Scoring with MLOps
+# LinkedIn Lead Scoring API
 
-**Smart lead qualification tool for business development professionals** — predict which LinkedIn contacts will likely respond to your invite requests, enabling data-driven outreach prioritization.
+**Predict which LinkedIn contacts will engage with your outreach** — a REST API that scores prospects based on profile data, enabling data-driven lead prioritization for business development.
 
-## Business Context
+## What it does
 
-This tool helps business development and sales teams **score LinkedIn prospects** before reaching out:
-- **Use case**: You maintain a list of potential leads on LinkedIn. Before sending connection requests or outreach messages, you want to know which contacts are most likely to respond (engage, view your profile, accept invites)
-- **Input**: LinkedIn profile data (job title, company, seniority, industry, location, profile summary, skills)
-- **Output**: Engagement probability score (0-1) with confidence level → label as "engaged" or "not_engaged"
-- **Business impact**: Focus outreach effort on high-probability prospects, reducing wasted messages, improving conversion rates
+You send LinkedIn profile data (job title, industry, seniority, company info...) and get back:
+- **Engagement score** (0.0 to 1.0)
+- **Label**: `engaged` or `not_engaged` (threshold: 0.5)
+- **Confidence**: `low` / `medium` / `high`
+- **Inference time** in milliseconds
 
-**Example scenario**: You have 500 potential leads in your target market. Your baseline response rate is 20% (100 replies). By using this model to filter and prioritize high-engagement prospects, you improve response rate to 40% (200 replies) — doubling your success rate and significantly improving pipeline quality.
+The model is an XGBoost classifier trained on 303 real LemList campaign contacts enriched with LLM-generated features, achieving F1=0.556 on cross-validation.
 
-## Project Overview
+## API Reference
 
-This is a complete MLOps pipeline for predicting LinkedIn lead engagement:
-- **MLflow experiment tracking** from data preparation through model training
-- **Jupyter notebooks** for data exploration and model development
-- **FastAPI REST API** with `/predict` and `/predict/batch` endpoints (live on staging)
-- **Streamlit monitoring dashboard** with drift detection and performance metrics
-- **Hybrid conda + uv** environment for package management
-- **CI/CD pipeline** with GitHub Actions (lint, test, Docker, deploy)
-- **Deployment** to Hugging Face Spaces (staging + production)
+**Base URLs:**
+- Production: `https://ghislaindelabie-oc6-bizdev-ml-api.hf.space`
+- Staging: `https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space`
+- Local: `http://localhost:7860`
 
-## Current Status (v0.3.1)
+### `POST /predict` — Score a single lead
 
-**299 tests passing | 50% coverage threshold | 93% production code coverage**
+**Request body** (all fields optional — missing fields use median/default values):
 
-Latest release includes hotfixes for dashboard and API stability (merged 2026-02-25). All core features deployed and tested.
+| Field | Type | Description |
+|-------|------|-------------|
+| `jobtitle` | string | Current job title |
+| `industry` | string | LinkedIn industry label |
+| `companyindustry` | string | Company industry |
+| `companysize` | string | Size range: `1-10`, `11-50`, `51-200`, `201-500`, `501-1000`, `1001-5000`, `5001-10000`, `10001+` |
+| `companytype` | string | `Privately Held`, `Public Company`, `Nonprofit`, etc. |
+| `companyfoundedon` | number | Founding year (e.g. 2015) |
+| `location` | string | Profile location (City, Region, Country) |
+| `companylocation` | string | Company location |
+| `languages` | string | Comma-separated languages |
+| `summary` | string | Professional summary text |
+| `skills` | string | Comma-separated skills |
+| `llm_quality` | integer | Profile quality score (0-100) |
+| `llm_engagement` | float | Engagement likelihood (0.0-1.0) |
+| `llm_decision_maker` | float | Decision maker probability (0.0-1.0) |
+| `llm_company_fit` | integer | Company fit (0, 1, or 2) |
+| `llm_seniority` | string | `Entry`, `Mid`, `Senior`, `Executive`, `C-Level` |
+| `llm_industry` | string | LLM-inferred industry |
+| `llm_geography` | string | `international_hub`, `regional_hub`, `other` |
+| `llm_business_type` | string | `leaders`, `experts`, `salespeople`, `workers`, `others` |
 
-### Architecture
+**Example:**
+```bash
+curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jobtitle": "VP of Sales",
+    "industry": "Computer Software",
+    "companysize": "201-500",
+    "llm_quality": 85,
+    "llm_engagement": 0.85,
+    "llm_decision_maker": 0.9,
+    "llm_seniority": "Senior"
+  }'
+```
+
+**Response:**
+```json
+{
+  "score": 0.78,
+  "label": "engaged",
+  "confidence": "high",
+  "model_version": "0.3.0",
+  "inference_time_ms": 0.21
+}
+```
+
+### `POST /predict/batch` — Score multiple leads (up to 10,000)
+
+**Request body:**
+```json
+{
+  "leads": [
+    {"jobtitle": "CTO", "llm_quality": 90, "llm_engagement": 0.9},
+    {"jobtitle": "Junior Analyst", "llm_quality": 25, "llm_engagement": 0.15}
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "predictions": [
+    {"score": 0.85, "label": "engaged", "confidence": "high", "model_version": "0.3.0", "inference_time_ms": 0.21},
+    {"score": 0.18, "label": "not_engaged", "confidence": "high", "model_version": "0.3.0", "inference_time_ms": 0.19}
+  ],
+  "total_count": 2,
+  "avg_score": 0.52,
+  "high_engagement_count": 1
+}
+```
+
+### `GET /health` — Health check
+
+```json
+{"status": "healthy", "service": "linkedin-lead-scoring-api", "version": "0.3.0", "model_loaded": true}
+```
+
+### `GET /docs` — Swagger UI (interactive API documentation)
+
+## n8n / Automation Integration
+
+This API is designed for integration with n8n, Make, or any HTTP-capable automation tool.
+
+### n8n HTTP Request node setup
+
+1. **Method**: POST
+2. **URL**: `https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict`
+3. **Body Content Type**: JSON
+4. **Body**: Map your LinkedIn data fields to the API schema above
+
+### Minimal payload (works with just a few fields)
+
+The API handles missing fields gracefully — you can send as little or as much data as you have:
+
+```json
+{"jobtitle": "CTO", "industry": "Technology", "companysize": "51-200"}
+```
+
+### Batch scoring workflow
+
+For bulk scoring (e.g., from a CSV or CRM export), use `/predict/batch`:
+1. Collect up to 10,000 leads in an array
+2. POST to `/predict/batch` with `{"leads": [...]}`
+3. Parse the `predictions` array — each entry has `score`, `label`, `confidence`
+4. Filter or sort by score to prioritize outreach
+
+### Confidence levels
+
+| Score range | Confidence | Label | Action |
+|-------------|------------|-------|--------|
+| 0.70 - 1.00 | high | engaged | Prioritize outreach |
+| 0.40 - 0.69 | medium | engaged/not_engaged | Review manually |
+| 0.00 - 0.39 | low | not_engaged | Skip or deprioritize |
+
+## Local Development
+
+### Setup
+
+```bash
+# Clone and setup
+git clone https://github.com/ghislaindelabie/oc6-linkedin-lead-scoring.git
+cd oc6-linkedin-lead-scoring
+
+# Option 1: Automated
+bash setup_env.sh
+
+# Option 2: Manual
+conda env create -f environment.yml
+conda activate oc6
+uv pip install -e ".[dev]"
+```
+
+### Run locally
+
+```bash
+# API (Terminal 1)
+conda activate oc6
+PYTHONPATH=src uvicorn linkedin_lead_scoring.api.main:app --port 7860
+
+# Monitoring dashboard (Terminal 2)
+conda activate oc6
+streamlit run streamlit_app.py
+
+# Open:
+#   API Swagger UI:  http://localhost:7860/docs
+#   Dashboard:       http://localhost:8501
+```
+
+### Run tests
+
+```bash
+conda activate oc6
+python -m pytest tests/ -v --tb=short        # 377 tests
+python -m pytest tests/ --cov=src/linkedin_lead_scoring --cov-report=term-missing
+```
+
+## Architecture
 
 ```
                      GitHub Actions CI/CD
                             |
-              push to v0.3.1 (staging) / main (production)
+              push to v0.3.x (staging) / main (production)
                             |
                 +-----------+-----------+
                 |                       |
@@ -51,399 +203,75 @@ Latest release includes hotfixes for dashboard and API stability (merged 2026-02
         FastAPI Scoring API     Monitoring Dashboard
           port 7860               port 8501
                 |                       |
-        Supabase PostgreSQL      Evidently AI
+        logs/predictions.jsonl   Evidently AI
         (prediction logging)     (drift detection)
 ```
 
-### What's done
+### Deployment
 
-- **Data pipeline**: Preparation + LLM enrichment notebooks with full MLflow tracking
-- **Model**: XGBoost classifier (Optuna-tuned, F1=0.556) — 1,909 contacts, 47 features
-- **Export**: `scripts/export_model.py` produces joblib model, preprocessor, feature columns, numeric medians
-- **API**: FastAPI with `/predict` (single lead), `/predict/batch` (up to 10,000), `/health`
-- **Preprocessing**: Target encoding, one-hot encoding (deterministic), text feature extraction, median imputation
-- **Database**: Async SQLAlchemy + Supabase PostgreSQL (prediction + API metric logging)
-- **Monitoring**: Evidently AI drift detection, Streamlit dashboard, ONNX optimization (26.5x speedup)
-- **CI/CD**: 5 GitHub Actions workflows (ci, staging, dashboard, security, production)
-- **Tests**: 15 test files, 299 tests — covers API, features, schemas, drift, monitoring, ONNX, profiler, docs, pipelines
-- **Validation**: `scripts/validate_pipeline.py` — confirms local model predictions match staging API
+| Environment | Trigger | API | Dashboard |
+|-------------|---------|-----|-----------|
+| **Staging** | Push to `v0.3.x` | [API](https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space) | [Dashboard](https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space) |
+| **Production** | Push to `main` | [API](https://ghislaindelabie-oc6-bizdev-ml-api.hf.space) | [Dashboard](https://ghislaindelabie-oc6-bizdev-monitoring.hf.space) |
 
-### Recent Merges (v0.3.1 → v0.3.1)
-
-| PR | Feature | Status |
-|----|---------|--------|
-| #12 | Hotfixes: dashboard + API stability | ✅ Merged 2026-02-25 |
-| #11 | v0.3.1 release: full MLOps pipeline | ✅ Merged 2026-02-24 |
-| #10 | Test hardening: OHE determinism + validation | ✅ Merged 2026-02-24 |
-| #9 | Security: Nuclei scan + E2E tests | ✅ Merged 2026-02-24 |
-| #8 | Production deployment workflow | ✅ Merged 2026-02-24 |
-
-## Quickstart
-
-### Setup Environment (Conda + uv Hybrid)
-
-```bash
-# Clone repository
-git clone https://github.com/ghislaindelabie/oc6-linkedin-lead-scoring.git
-cd oc6-linkedin-lead-scoring
-
-# Option 1: Automated setup
-bash setup_env.sh
-
-# Option 2: Manual setup
-conda env create -f environment.yml
-conda activate oc6
-uv pip install -e ".[dev]"
-
-# Verify installation
-python -c "import mlflow, xgboost, sklearn; print('✓ All packages ready!')"
-```
-
-See `SETUP_ENVIRONMENT.md` for detailed setup instructions.
-
-### Run Notebooks
-
-```bash
-# Start MLflow UI (in terminal 1)
-conda activate oc6
-mlflow ui --port 5000
-
-# Start Jupyter Lab (in terminal 2)
-conda activate oc6
-jupyter lab
-
-# Open notebooks in notebooks/ directory
-# 01_linkedin_data_prep.ipynb - Data preparation
-# 02_linkedin_model_training.ipynb - Model training
-```
-
-### Run API Locally
-
-```bash
-conda activate oc6
-uvicorn linkedin_lead_scoring.api.main:app --reload
-
-# View at http://localhost:8000/docs
-```
-
-### Run Tests
-
-```bash
-conda activate oc6
-pytest
-pytest --cov=src/linkedin_lead_scoring --cov-report=term-missing
-```
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Landing page |
-| `/health` | GET | Health check (model status, version) |
-| `/predict` | POST | Score a single lead — returns `{score, label, inference_ms}` |
-| `/predict/batch` | POST | Score up to 10,000 leads in one call |
-| `/docs` | GET | Swagger UI documentation |
-| `/redoc` | GET | ReDoc documentation |
-
-**Example request:**
-```bash
-curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space/predict \
-  -H "Content-Type: application/json" \
-  -d '{"jobtitle": "CTO", "industry": "tech", "companysize": "11-50", "llm_quality": 80}'
-```
-
-**Example response:**
-```json
-{"score": 0.73, "label": "engaged", "inference_ms": 0.21, "model_version": "0.3.1"}
-```
-
-## Testing Examples
-
-Try these fake LinkedIn profiles to test the API and see engagement scores. The model has learned patterns from business development outreach data.
-
-### ✅ High Engagement Profile (Likely to respond)
-
-**Scenario**: Senior executive at growing tech company, actively engaged, decision-maker
-```bash
-curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jobtitle": "VP of Sales",
-    "industry": "Computer Software",
-    "companyindustry": "Software Development",
-    "companysize": "201-500",
-    "companytype": "Privately Held",
-    "companyfoundedon": 2015,
-    "location": "San Francisco, California, United States",
-    "llm_seniority": "Senior",
-    "llm_quality": 85,
-    "llm_engagement": 0.85,
-    "llm_decision_maker": 0.9,
-    "llm_company_fit": 1,
-    "llm_geography": "international_hub",
-    "llm_business_type": "leaders",
-    "languages": "English, French",
-    "summary": "15+ years B2B SaaS sales leadership. Scaled revenue from $2M to $50M. Growth-focused, always open to strategic partnerships.",
-    "skills": "Sales Leadership, SaaS, Revenue Growth, Team Building, Negotiation"
-  }'
-```
-
-**Expected response:**
-```json
-{
-  "score": 0.78,
-  "label": "engaged",
-  "confidence": "high",
-  "model_version": "0.3.1",
-  "inference_time_ms": 0.21
-}
-```
-
-### ❌ Low Engagement Profile (Unlikely to respond)
-
-**Scenario**: Entry-level individual contributor at large corporation, generic profile, limited fit
-```bash
-curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jobtitle": "Junior Analyst",
-    "industry": "Banking",
-    "companyindustry": "Financial Services",
-    "companysize": "10001+",
-    "companytype": "Public Company",
-    "companyfoundedon": 1975,
-    "location": "Mumbai, Maharashtra, India",
-    "llm_seniority": "Entry",
-    "llm_quality": 35,
-    "llm_engagement": 0.2,
-    "llm_decision_maker": 0.1,
-    "llm_company_fit": 2,
-    "llm_geography": "other",
-    "llm_business_type": "workers",
-    "languages": "English",
-    "summary": "Working in finance.",
-    "skills": "Excel, Data Entry"
-  }'
-```
-
-**Expected response:**
-```json
-{
-  "score": 0.22,
-  "label": "not_engaged",
-  "confidence": "high",
-  "model_version": "0.3.1",
-  "inference_time_ms": 0.21
-}
-```
-
-### 🔶 Medium Engagement Profile (Borderline case)
-
-**Scenario**: Mid-level manager at growing company, some alignment but not perfect fit
-```bash
-curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jobtitle": "Product Manager",
-    "industry": "Information Technology & Services",
-    "companyindustry": "Software Development",
-    "companysize": "51-200",
-    "companytype": "Privately Held",
-    "companyfoundedon": 2018,
-    "location": "Paris, Île-de-France, France",
-    "llm_seniority": "Mid",
-    "llm_quality": 65,
-    "llm_engagement": 0.55,
-    "llm_decision_maker": 0.45,
-    "llm_company_fit": 1,
-    "llm_geography": "international_hub",
-    "llm_business_type": "experts",
-    "languages": "French, English, Spanish",
-    "summary": "Product Manager with 8 years experience in SaaS. Interested in process optimization and team collaboration.",
-    "skills": "Product Management, SaaS, User Research, Analytics, Agile"
-  }'
-```
-
-**Expected response:**
-```json
-{
-  "score": 0.52,
-  "label": "engaged",
-  "confidence": "medium",
-  "model_version": "0.3.1",
-  "inference_time_ms": 0.21
-}
-```
-
-### Batch Testing (Multiple Leads)
-
-Test multiple leads in a single API call:
-```bash
-curl -X POST https://ghislaindelabie-oc6-bizdev-ml-api.hf.space/predict/batch \
-  -H "Content-Type: application/json" \
-  -d '{
-    "leads": [
-      {
-        "jobtitle": "CTO",
-        "industry": "Technology - SaaS",
-        "companysize": "11-50",
-        "llm_quality": 90,
-        "llm_engagement": 0.9
-      },
-      {
-        "jobtitle": "HR Administrator",
-        "industry": "Retail",
-        "companysize": "5001-10000",
-        "llm_quality": 25,
-        "llm_engagement": 0.15
-      },
-      {
-        "jobtitle": "Sales Manager",
-        "industry": "Real Estate",
-        "companysize": "201-500",
-        "llm_quality": 70,
-        "llm_engagement": 0.65
-      }
-    ]
-  }'
-```
-
-**Expected response:**
-```json
-{
-  "predictions": [
-    {"score": 0.85, "label": "engaged", "confidence": "high", "model_version": "0.3.1", "inference_time_ms": 0.21},
-    {"score": 0.18, "label": "not_engaged", "confidence": "high", "model_version": "0.3.1", "inference_time_ms": 0.19},
-    {"score": 0.68, "label": "engaged", "confidence": "high", "model_version": "0.3.1", "inference_time_ms": 0.20}
-  ],
-  "total_count": 3,
-  "avg_score": 0.57,
-  "high_engagement_count": 2
-}
-```
+**Promotion flow:** `feature/* --> v0.3.x (staging) --> main (production)`
 
 ## Project Structure
 
 ```
 oc6-linkedin-lead-scoring/
 ├── src/linkedin_lead_scoring/        # Main package
-│   ├── api/                          # FastAPI application
-│   │   ├── main.py                   # App entry point, CORS, exception handlers
-│   │   ├── predict.py                # /predict and /predict/batch endpoints
-│   │   ├── schemas.py                # Pydantic request/response models
-│   │   └── middleware.py             # Request logging, rate limits, tracing
-│   ├── monitoring/                   # Monitoring & optimization
-│   │   ├── drift.py                  # Evidently AI drift detection (DriftDetector)
-│   │   ├── dashboard_utils.py        # Log parsing, metrics, simulation
-│   │   ├── onnx_optimizer.py         # XGBoost-to-ONNX conversion + benchmarks
-│   │   └── profiler.py               # Inference timing (cProfile, perf_counter)
-│   ├── features.py                   # Feature engineering & preprocessing
-│   ├── data/                         # Data processing (LLM enrichment, utils)
-│   └── db/                           # Async DB layer (SQLAlchemy + Supabase)
-├── scripts/
-│   ├── export_model.py               # Re-train & export production artifacts
-│   ├── validate_pipeline.py          # Local-vs-API prediction comparison
-│   ├── optimize_model.py             # ONNX conversion + benchmark
-│   └── profile_api.py               # API load testing
-├── model/                            # Committed production artifacts
+│   ├── api/                          # FastAPI (main.py, predict.py, schemas.py, middleware.py)
+│   ├── monitoring/                   # Drift detection, dashboard utils, ONNX optimizer, profiler
+│   ├── db/                           # Async DB layer (SQLAlchemy + Supabase)
+│   ├── data/                         # Data processing (LLM enrichment)
+│   └── features.py                   # Feature engineering & preprocessing
+├── model/                            # Production model artifacts (v1)
 │   ├── xgboost_model.joblib          # Trained XGBoost classifier (47 features)
 │   ├── preprocessor.joblib           # Fitted TargetEncoder pipeline
 │   ├── feature_columns.json          # Ordered feature column names
 │   └── numeric_medians.json          # Median values for imputation
-├── data/
-│   ├── processed/linkedin_leads_clean.csv  # Training data (1,909 rows)
-│   └── reference/training_reference.csv    # Drift detection baseline
-├── streamlit_app.py                  # Monitoring dashboard entry point
+├── model_v2/                         # Retrained model artifacts (experimental)
 ├── notebooks/                        # Jupyter notebooks with MLflow tracking
-├── tests/                            # Test suite (15 files, 299 tests)
-├── .github/workflows/                # CI/CD (ci, staging, production, dashboard, security)
-├── Dockerfile                        # API container for HF Spaces
-├── requirements-prod.txt             # Production API dependencies
-├── requirements-streamlit.txt        # Monitoring dashboard dependencies
-├── environment.yml                   # Conda environment (scientific packages)
-└── pyproject.toml                    # Project metadata & dev dependencies
+│   ├── 01_linkedin_data_prep.ipynb   # Data preparation
+│   ├── 02_linkedin_model_training.ipynb  # Model training (Optuna)
+│   ├── 03_performance_analysis.ipynb # Inference profiling (joblib vs ONNX)
+│   └── 04_drift_monitoring_analysis.ipynb  # Drift analysis & retraining
+├── scripts/                          # CLI tools (export, validate, optimize, profile, retrain)
+├── tests/                            # 377 tests (API, features, schemas, drift, monitoring, pipelines)
+├── docs/                             # Technical documentation
+├── streamlit_app.py                  # Monitoring dashboard entry point
+├── .github/workflows/                # CI/CD (5 workflows)
+├── Dockerfile                        # API container
+├── Dockerfile.streamlit              # Dashboard container
+└── .old/                             # Archived planning documents
 ```
 
-## Development Workflow
+## Documentation
 
-This project follows **Git Flow** with semantic versioning:
-- `main` - Production-ready code (auto-deploys to HF Spaces)
-- `release/X.Y.0` - Release preparation
-- `feature/*` - Feature development
-- `hotfix/*` - Emergency fixes
+| Document | Description |
+|----------|-------------|
+| [Architecture Decisions](docs/ARCHITECTURE_DECISIONS.md) | 16 ADRs explaining key design choices |
+| [Monitoring Guide](docs/MONITORING_GUIDE.md) | Dashboard usage, alert thresholds, commands |
+| [Data Drift Guide](docs/DATA_DRIFT_GUIDE.md) | Drift theory, detection methods, Evidently integration |
+| [Performance Report](docs/PERFORMANCE_REPORT.md) | joblib vs ONNX benchmarks (26.5x speedup) |
+| [Top-K Precision Guide](docs/TOP_K_PRECISION_PRODUCTION_GUIDE.md) | Production lead prioritization strategy |
+| [Known Issues](KNOWN_ISSUES.md) | Current limitations and recommended fixes |
+| [Version History](VERSION_HISTORY.md) | Full changelog from v0.1.0 to v0.3.2 |
 
-See `BRANCHING_STRATEGY.md` for detailed workflow.
+## MLOps Stack
 
-## Testing
-
-```bash
-# Run all tests
-python -m pytest tests/ -v --tb=short
-
-# Run with coverage
-python -m pytest tests/ --cov=src/linkedin_lead_scoring --cov-report=term-missing
-
-# Validate model pipeline (local predictions match API)
-python scripts/validate_pipeline.py --local-only
-```
-
-**Current status**: 299 tests, 55% overall coverage (93% on production code — two training-only data modules account for the gap).
-
-## Deployment
-
-Two-stage deployment via GitHub Actions:
-
-| Environment | Trigger | API URL | Dashboard URL |
-|-------------|---------|---------|---------------|
-| **Staging** | Push to `v0.3.1` | [staging API](https://ghislaindelabie-oc6-bizdev-ml-api-staging.hf.space) | [staging dashboard](https://ghislaindelabie-oc6-bizdev-monitoring-staging.hf.space) |
-| **Production** | Push to `main` | [production API](https://ghislaindelabie-oc6-bizdev-ml-api.hf.space) | [production dashboard](https://ghislaindelabie-oc6-bizdev-monitoring.hf.space) |
-
-**Promotion flow:** `feature/* --> v0.3.1 (staging) --> main (production)`
-
-## MLOps Features
-
-- **Experiment Tracking:**
-  - MLflow tracking integrated from data preparation through model training
-  - Automatic project root detection for centralized tracking
-  - All data operations, model training, and hyperparameter tuning logged
-  - Model registry ready for production deployment
-
-- **Environment Management:**
-  - Hybrid conda + uv approach for optimal package management
-  - Conda: Scientific packages (numpy, pandas, scikit-learn, jupyter)
-  - uv: Specialized ML packages (mlflow, xgboost, fastapi, optuna)
-  - Automated setup script for reproducibility
-
-- **Automated Testing:**
-  - 299 tests across 15 test files (unit, integration, structural)
-  - Ruff linting on all source and test files
-  - CI/CD pipeline validates before every deployment
-
-- **CI/CD Pipeline (5 workflows):**
-  - **`ci.yml`**: every push/PR — ruff lint, pytest with coverage gate, Docker build check
-  - **`staging.yml`**: push to `v*.*.*` — deploy API + dashboard to staging HF Spaces
-  - **`production.yml`**: push to `main` — deploy API + dashboard to production HF Spaces
-  - **`dashboard.yml`**: deploy Streamlit monitoring dashboard on push to main
-  - **`security.yml`**: weekly pip-audit (dependency CVEs) + bandit (static analysis)
-
-- **Production Logging:**
-  - Async SQLAlchemy + Supabase PostgreSQL for prediction and API metric logging
-  - Tables: `prediction_logs` (score, features, inference time) + `api_metrics` (endpoint, status, latency)
-  - Local dev falls back to SQLite automatically (no setup needed)
-  - Alembic migrations in `alembic/` — run `alembic upgrade head` before first deploy
-
-- **Model Monitoring:**
-  - Evidently AI drift detection (data drift + prediction score drift)
-  - Streamlit monitoring dashboard (`streamlit_app.py`) with live metrics
-  - ONNX Runtime optimization: 26.5x inference speedup over joblib
-  - Performance profiling with cProfile and tracemalloc
-  - See `docs/MONITORING_GUIDE.md` and `docs/PERFORMANCE_REPORT.md`
+| Component | Technology |
+|-----------|-----------|
+| ML Framework | XGBoost + scikit-learn |
+| Experiment Tracking | MLflow (filesystem) |
+| API | FastAPI + uvicorn |
+| Monitoring | Evidently AI + Streamlit |
+| Database | Supabase PostgreSQL (async SQLAlchemy) |
+| CI/CD | GitHub Actions (lint, test, Docker, deploy) |
+| Deployment | Hugging Face Spaces (Docker) |
+| Performance | ONNX Runtime (optional, 26.5x speedup) |
 
 ## License
 
-MIT License - see LICENSE file
-
-## About
-
-**Project:** OpenClassrooms OC6 - MLOps
-**Purpose:** Business development tool for LinkedIn lead scoring and engagement prediction
+MIT License — see LICENSE file.
